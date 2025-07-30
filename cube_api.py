@@ -1544,7 +1544,7 @@ async def debug_endpoint(request: Request):
 # --- SOCKET ENDPOINTS ---
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time communication"""
+    """WebSocket endpoint for real-time communicationc"""
     await websocket.accept()
 
     try:
