@@ -4,7 +4,7 @@ let object = {
     github_lampa: 'https://yumata.github.io/lampa/',
     css_version: '2.7.0',
     app_version: '2.4.6',
-    cub_site: 'cub.rip'
+    cub_site: 'localhost:8000'
 }
 
 let plugins = []
@@ -65,9 +65,9 @@ Object.defineProperty(object, 'soc_mirrors', {
  */
 Object.defineProperty(object, 'cub_domain', { 
     get: ()=> {
-        let use = localStorage.getItem('cub_domain') || ''
+        let use = localStorage.getItem('cub_domain') || object.cub_site
 
-        return object.cub_mirrors.indexOf(use) > -1 ? use : object.cub_mirrors[0]
+        return object.cub_site
     } 
 })
 

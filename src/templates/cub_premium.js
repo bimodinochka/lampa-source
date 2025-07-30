@@ -1,5 +1,5 @@
 let html = `<div class="cub-premium">
-    <div class="cub-premium__title">CUB Premium</div>
+    <div class="cub-premium__title">TUB Premium</div>
     <div class="cub-premium__descr">
         #{account_premium}
     </div>

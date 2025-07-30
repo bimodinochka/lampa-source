@@ -314,6 +314,11 @@ function shortText(fullStr, strLen, separator){
 }
 
 function protocol(){
+    // Для локального сервера всегда используем HTTP
+    if(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0') {
+        return 'http://'
+    }
+    
     return window.location.protocol == 'https:' ? 'https://' : (localStorage.getItem('protocol') || 'https') + '://'
 }
 

@@ -122,7 +122,7 @@ if(typeof window.lampa_settings == 'undefined'){
 
 Arrays.extend(window.lampa_settings,{
     socket_use: true,
-    socket_url: undefined,
+    socket_url: 'ws://localhost:8000/ws',
     socket_methods: true,
 
     account_use: true,

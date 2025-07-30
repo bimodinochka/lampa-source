@@ -59,7 +59,7 @@ class Item{
 
         let premium = document.createElement('span')
             premium.classList.add('extensions__item-premium')
-            premium.innerText = 'CUB Premium'
+            premium.innerText = 'TUB Premium'
 
         let where = author || this.html
 

@@ -1,0 +1,1500 @@
+from fastapi import FastAPI, Request, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, FileResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from typing import Optional
+import json
+import os
+import time
+
+app = FastAPI(title="Cube API Replacement", version="1.0")
+
+# --- CORS MIDDLEWARE ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # В продакшене лучше указать конкретные домены
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# --- STATIC FILES ---
+# Создаем папку для статических файлов если её нет
+os.makedirs("static/img/other", exist_ok=True)
+
+# Монтируем статические файлы
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# --- CONFIG ---
+TMDB_API_KEY = "4ef0d7355d9ffb5151e987764708ce96"
+TMDB_API_VERSION = "3"  # Можно изменить на "4" для новой версии API
+TMDB_BASE_URL = f"https://api.themoviedb.org/{TMDB_API_VERSION}"
+PREMIUM_EXPIRY = 1761683315507  # Реальная дата окончания премиума
+
+
+# --- LOAD TEST DATA ---
+def load_test_data():
+    """Load test data from JSON file"""
+    try:
+        with open("test_data.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print("Warning: test_data.json not found, using empty data")
+        return {}
+    except json.JSONDecodeError as e:
+        print(f"Error loading test_data.json: {e}")
+        return {}
+
+
+def get_test_data(key, default=None):
+    """Safely get test data with fallback"""
+    return TEST_DATA.get(key, default if default is not None else [])
+
+
+def save_test_data():
+    """Save test data back to JSON file"""
+    try:
+        with open("test_data.json", "w", encoding="utf-8") as f:
+            json.dump(TEST_DATA, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving test_data.json: {e}")
+
+
+def update_test_data(key, value):
+    """Update test data and save to file"""
+    TEST_DATA[key] = value
+    save_test_data()
+
+
+TEST_DATA = load_test_data()
+
+
+# --- PREMIUM CHECK FUNCTION ---
+def check_premium_status(token: str) -> dict:
+    """Check if user has premium status based on token"""
+    print(f"check_premium_status: checking token={token}")
+
+    # Проверяем, есть ли устройство с таким токеном
+    device = None
+    for dev in get_test_data("devices", []):
+        if dev["token"] == token:
+            device = dev
+            break
+
+    print(f"check_premium_status: found device={device}")
+
+    if not device:
+        print(f"check_premium_status: device not found for token={token}")
+        return {"valid": False, "premium": False, "message": "Invalid token"}
+
+    # Проверяем премиум статус (время окончания подписки)
+    current_time = int(time.time())
+    premium_expiry = PREMIUM_EXPIRY
+
+    is_premium = current_time < premium_expiry
+
+    result = {
+        "valid": True,
+        "premium": is_premium,
+        "premium_expiry": premium_expiry,
+        "current_time": current_time,
+        "device": device
+    }
+
+    print(f"check_premium_status: result={result}")
+    return result
+
+
+# --- PREMIUM STATUS ---
+@app.get("/api/premium/status")
+def get_premium_status(token: str = Header(...)):
+    """Check premium status of user"""
+    status = check_premium_status(token)
+    return {
+        "valid": status["valid"],
+        "premium": status["premium"],
+        "premium_expiry": status["premium_expiry"],
+        "current_time": status["current_time"],
+        "days_remaining": max(0, (status["premium_expiry"] - status["current_time"]) // 86400)
+    }
+
+
+@app.get("/api/premium/status/debug")
+def get_premium_status_debug():
+    """Debug endpoint to check premium status without token"""
+    return {
+        "devices": get_test_data("devices", []),
+        "current_time": int(time.time()),
+        "premium_expiry": PREMIUM_EXPIRY,
+        "is_premium": int(time.time()) < PREMIUM_EXPIRY
+    }
+
+
+@app.get("/api/account/status")
+def get_account_status(token: str = Header(...)):
+    """Get account status in format expected by Lampa"""
+    status = check_premium_status(token)
+
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+
+    # Возвращаем данные в том же формате, что и официальный сервер
+    account_data = get_test_data("account", {})
+    return {
+        "secuses": True,
+        "email": account_data.get("email", "igor.tonin@inbox.ru"),
+        "id": account_data.get("id", 148608),
+        "token": token,
+        "profile": account_data.get("profile", {
+            "id": 153918,
+            "cid": 148608,
+            "name": "Общий",
+            "main": 1,
+            "icon": "l_1"
+        })
+    }
+
+
+@app.get("/api/premium/check")
+def check_premium_endpoint(token: str = Header(...)):
+    """Check premium status in simple format"""
+    status = check_premium_status(token)
+
+    if not status["valid"]:
+        return {"premium": False, "error": "Invalid token"}
+
+    return {
+        "premium": status["premium"],
+        "expiry": status["premium_expiry"],
+        "days_remaining": max(0, (status["premium_expiry"] - status["current_time"]) // 86400)
+    }
+
+
+@app.get("/api/premium/status/simple")
+def get_premium_status_simple():
+    """Simple premium status check (no token required)"""
+    current_time = int(time.time())
+    premium_expiry = PREMIUM_EXPIRY
+    is_premium = current_time < premium_expiry
+
+    return {
+        "premium": is_premium,
+        "premium_value": 1 if is_premium else 0,  # Для совместимости с приложением
+        "expiry": premium_expiry,
+        "current_time": current_time,
+        "days_remaining": max(0, (premium_expiry - current_time) // 86400)
+    }
+
+
+@app.get("/api/premium/check/app")
+def check_premium_for_app():
+    """Premium check endpoint specifically for the app"""
+    current_time = int(time.time())
+    premium_expiry = PREMIUM_EXPIRY
+    is_premium = current_time < premium_expiry
+
+    return {
+        "status": "ok",
+        "premium": is_premium,
+        "premium_value": 1 if is_premium else 0,
+        "expiry": premium_expiry,
+        "current_time": current_time,
+        "message": "Premium subscription is active until 2025" if is_premium else "Premium subscription expired"
+    }
+
+
+# --- USER PROFILE ---
+@app.get("/api/profiles/all")
+def get_profiles(token: str = Header(...)):
+    print(f"Profiles requested with token: {token}")
+    response = {
+        "secuses": True,
+        "profiles": get_test_data("profiles", [])
+    }
+    print(f"Returning profiles: {response}")
+    return response
+
+
+@app.post("/api/device/add")
+async def add_device(request: Request):
+    """Add device using 6-digit code from website"""
+    try:
+        # Получаем данные из формы
+        form_data = await request.form()
+        code = form_data.get("code")
+
+        if not code:
+            # Попробуем получить из JSON
+            body = await request.json()
+            code = body.get("code")
+
+        if not code:
+            raise HTTPException(status_code=400, detail="Code parameter required")
+
+        print(f"Received code: {code}")
+        code_str = str(code)
+
+        device_codes = get_test_data("device_codes", {})
+        if code_str in device_codes:
+            device_data = device_codes[code_str]
+
+            # Add device to devices list
+            devices = get_test_data("devices", [])
+            device_id = len(devices) + 1
+            new_device = {
+                "id": device_id,
+                "name": device_data["name"],
+                "platform": device_data["platform"],
+                "token": device_data["token"]
+            }
+            devices.append(new_device)
+            update_test_data("devices", devices)
+
+            response_data = {
+                "secuses": True,
+                "email": "igor.tonin@inbox.ru",
+                "id": 148608,
+                "token": device_data["token"],
+                "profile": {
+                    "id": 153918,
+                    "cid": 148608,
+                    "name": "Общий",
+                    "main": 1,
+                    "icon": "l_1"
+                }
+            }
+
+            print(f"Returning response: {response_data}")
+            return response_data
+        else:
+            print(f"Invalid code: {code_str}")
+            raise HTTPException(status_code=400, detail="Invalid device code")
+    except Exception as e:
+        print(f"Error in add_device: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# --- BOOKMARKS ---
+@app.get("/api/bookmarks/all")
+def get_bookmarks(token: str = Header(...)):
+    # Проверяем премиум статус для синхронизации закладок
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for bookmarks sync")
+
+    return {"bookmarks": get_test_data("bookmarks", [])}
+
+
+@app.post("/api/bookmarks/add")
+async def add_bookmark(bookmark: dict, token: str = Header(...)):
+    # Проверяем премиум статус для синхронизации закладок
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for bookmarks sync")
+
+    bookmarks = get_test_data("bookmarks", [])
+    bookmarks.append(bookmark)
+    update_test_data("bookmarks", bookmarks)
+    return {"status": "ok", "bookmark": bookmark}
+
+
+@app.post("/api/bookmarks/clear")
+async def clear_bookmarks(data: dict, token: str = Header(...)):
+    return {"status": "ok", "cleared": True}
+
+
+# --- NOTIFICATIONS ---
+@app.get("/api/notifications/all")
+def get_notifications(token: str = Header(...)):
+    # Проверяем премиум статус для уведомлений
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for notifications")
+
+    return {
+        "secuses": True,
+        "notifications": get_test_data("notifications", [])
+    }
+
+
+@app.post("/api/notifications/add")
+async def add_notification(request: Request, token: str = Header(...)):
+    # Проверяем премиум статус для уведомлений
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for notifications")
+
+    try:
+        # Получаем данные из формы
+        form_data = await request.form()
+        voice = form_data.get("voice", "")
+        data_str = form_data.get("data", "{}")
+        episode = form_data.get("episode", "")
+        season = form_data.get("season", "")
+
+        # Парсим JSON из строки data
+        import json
+        try:
+            data = json.loads(data_str)
+        except:
+            data = {}
+
+        # Создаем новое уведомление
+        import time
+        new_notification = {
+            "id": int(time.time() * 1000),  # Генерируем уникальный ID
+            "cid": 148608,
+            "voice": voice,
+            "card_id": str(data.get("id", "")),
+            "card": json.dumps(data),  # Сохраняем полные данные как JSON строку
+            "status": 1,
+            "time": int(time.time() * 1000),
+            "time_update": int(time.time() * 1000),
+            "episode": int(episode) if episode.isdigit() else 0,
+            "season": int(season) if season.isdigit() else 0,
+            "profile": 153918
+        }
+
+        notifications = get_test_data("notifications", [])
+        notifications.append(new_notification)
+        update_test_data("notifications", notifications)
+
+        return {"secuses": True}
+    except Exception as e:
+        print(f"Error in add_notification: {e}")
+        return {"secuses": True}
+
+
+# --- LOGS ---
+@app.post("/api/lampa/logs/write")
+async def write_log(log: dict, token: str = Header(...)):
+    logs = get_test_data("logs", [])
+    logs.append(log)
+    update_test_data("logs", logs)
+    return {"status": "ok"}
+
+
+# --- PERSON SUBSCRIBE/UNSUBSCRIBE ---
+@app.post("/api/person/subscribe")
+async def subscribe_person(request: Request, token: str = Header(...)):
+    # Проверяем премиум статус для подписки на персон
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for person subscriptions")
+
+    try:
+        # Получаем данные из формы
+        form_data = await request.form()
+        person_data = form_data.get("person")
+
+        if person_data:
+            # Парсим JSON из строки
+            import json
+            person = json.loads(person_data)
+        else:
+            # Попробуем получить из JSON body
+            body = await request.json()
+            person = body.get("person", {})
+
+        person_subscribes = get_test_data("person_subscribes", [])
+        person_subscribes.append(person)
+        update_test_data("person_subscribes", person_subscribes)
+        return {"secuses": True}
+    except Exception as e:
+        print(f"Error in subscribe_person: {e}")
+        return {"secuses": True}
+
+
+@app.post("/api/person/unsubscribe")
+async def unsubscribe_person(request: Request, token: str = Header(...)):
+    try:
+        # Получаем данные из формы
+        form_data = await request.form()
+        person_data = form_data.get("person")
+
+        if person_data:
+            # Парсим JSON из строки
+            import json
+            person = json.loads(person_data)
+        else:
+            # Попробуем получить из JSON body
+            body = await request.json()
+            person = body.get("person", {})
+
+        person_subscribes = get_test_data("person_subscribes", [])
+        update_test_data("person_subscribes", [p for p in person_subscribes if p.get("id") != person.get("id")])
+        return {"secuses": True}
+    except Exception as e:
+        print(f"Error in unsubscribe_person: {e}")
+        return {"secuses": True}
+
+
+# --- DISCUSSIONS ---
+@app.get("/api/discuss/get/{method_id}/{page}/{lang}")
+def get_discuss(method_id: str, page: int, lang: str, token: Optional[str] = Header(None)):
+    key = f"{method_id}_{page}_{lang}"
+    return get_test_data("discuss", {}).get(key, {"result": [], "total": 0, "total_pages": 1})
+
+
+@app.post("/api/discuss/add")
+async def add_discuss(comment: dict, token: str = Header(...)):
+    key = f"{comment.get('method_id', 'unknown')}_1_{comment.get('lang', 'ru')}"
+    discuss = get_test_data("discuss", {})
+    if key not in discuss:
+        discuss[key] = {"result": [], "total": 0, "total_pages": 1}
+    discuss[key]["result"].append(comment)
+    discuss[key]["total"] += 1
+    update_test_data("discuss", discuss)
+    return {"status": "ok", "comment": comment}
+
+
+@app.post("/api/discuss/voite")
+async def voite_discuss(data: dict, token: str = Header(...)):
+    return {"status": "ok", "voted": True}
+
+
+# --- REACTIONS ---
+@app.get("/api/reactions/get/{method_id}")
+def get_reactions(method_id: str, token: Optional[str] = Header(None)):
+    return get_test_data("reactions", {}).get(method_id, {"result": []})
+
+
+@app.post("/api/reactions/add/{method_id}/{type}")
+async def add_reaction(method_id: str, type: str, reaction: dict, token: str = Header(...)):
+    reactions = get_test_data("reactions", {})
+    if method_id not in reactions:
+        reactions[method_id] = {"result": []}
+    reactions[method_id]["result"].append({"type": type, **reaction})
+    update_test_data("reactions", reactions)
+    return {"status": "ok"}
+
+
+# --- COLLECTIONS ---
+@app.get("/api/collections/list")
+def get_collections(category: Optional[str] = None, token: str = Header(...)):
+    collections = get_test_data("collections", [])
+    if category:
+        collections = [c for c in collections if c.get("category") == category]
+    return {"results": collections}
+
+
+# --- TRAILERS ---
+@app.get("/api/trailers/short/trailers/{type}")
+def get_trailers(type: str, token: Optional[str] = Header(None)):
+    return get_test_data("trailers", {}).get(type, {"results": []})
+
+
+@app.get("/api/trailers/get/trailers/{type}/{page}")
+def get_trailers_with_page(type: str, page: int, token: str = Header(...)):
+    """Get trailers with pagination"""
+    return {
+        "secuses": True,
+        "page": page,
+        "total_pages": 22,
+        "results": get_test_data("trailers", {}).get(f"{type}_{page}", [])
+    }
+
+
+# --- TIMELINE ---
+@app.get("/api/timeline/all")
+def get_timeline(token: str = Header(...)):
+    # Проверяем премиум статус для timeline
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for timeline sync")
+
+    return {"timelines": get_test_data("timeline", [])}
+
+
+# --- FEED ---
+@app.get("/api/feed/all")
+def get_feed(token: Optional[str] = Header(None)):
+    return {"secuses": True, "result": get_test_data("feed", [])}
+
+
+# --- AD/ADV/STAT ---
+@app.get("/api/ad/stat")
+def ad_stat(platform: str = Query(...), type: str = Query(...), method: str = Query(None), name: str = Query(None)):
+    ad_stat = get_test_data("ad_stat", [])
+    ad_stat.append({"platform": platform, "type": type, "method": method, "name": name})
+    update_test_data("ad_stat", ad_stat)
+    return {"status": "ok"}
+
+
+@app.get("/api/ad/all")
+def ad_all(token: str = Header(None)):
+    return get_test_data("ad_all", [])
+
+
+@app.get("/api/ad/vast")
+def ad_vast(token: str = Header(None)):
+    return get_test_data("ad_vast", {})
+
+
+@app.post("/api/adv/log")
+async def adv_log(data: dict, token: str = Header(None)):
+    adv_log = get_test_data("adv_log", [])
+    adv_log.append(data)
+    update_test_data("adv_log", adv_log)
+    return {"status": "ok"}
+
+
+@app.post("/api/payment/event_prime")
+async def payment_event_prime(data: dict, token: str = Header(None)):
+    event_prime = get_test_data("event_prime", [])
+    event_prime.append(data)
+    update_test_data("event_prime", event_prime)
+    return {"status": "ok"}
+
+
+# --- AI ---
+@app.get("/api/ai/generate/facts/{card_id}/{card_type}")
+def ai_generate_facts(card_id: str, card_type: str, token: str = Header(...), profile: Optional[str] = Header(None)):
+    # Проверяем премиум статус для AI функций
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for AI features")
+
+    key = f"{card_id}_{card_type}"
+    return get_test_data("ai_facts", {}).get(key, {"results": [], "status": "stub"})
+
+
+@app.get("/api/ai/generate/recommend/{card_id}/{card_type}")
+def ai_generate_recommend(card_id: str, card_type: str, token: str = Header(...),
+                          profile: Optional[str] = Header(None)):
+    # Проверяем премиум статус для AI функций
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for AI features")
+
+    key = f"{card_id}_{card_type}"
+    return get_test_data("ai_recommend", {}).get(key, {"results": [], "status": "stub"})
+
+
+@app.get("/api/ai/search/{query}")
+def ai_search(query: str, token: str = Header(...), profile: Optional[str] = Header(None)):
+    # Проверяем премиум статус для AI функций
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for AI features")
+
+    return get_test_data("ai_search", {}).get(query, {"results": [], "status": "stub"})
+
+
+# --- PLUGINS ---
+@app.get("/api/plugins/blacklist")
+def get_plugins_blacklist(token: str = Header(None)):
+    return get_test_data("plugins_blacklist", [])
+
+
+@app.get("/api/plugins/all")
+def get_plugins_all(token: str = Header(...)):
+    return {
+        "secuses": True,
+        "plugins": get_test_data("plugins", [])
+    }
+
+
+@app.get("/api/extensions/list")
+def get_extensions_list(token: str = Header(...)):
+    return {
+        "secuses": True,
+        "results": get_test_data("extensions", [])
+    }
+
+
+@app.post("/api/extensions/status")
+async def extensions_status(data: dict, token: str = Header(...)):
+    return {"status": "ok"}
+
+
+@app.post("/api/plugins/status")
+async def plugins_status(data: dict, token: str = Header(...)):
+    return {"status": "ok"}
+
+
+# --- USERS ---
+@app.get("/api/users/get")
+def get_users(token: Optional[str] = Header(None)):
+    print(f"Users/get requested with token: {token}")
+
+    # Если токен не предоставлен, возвращаем базовые данные
+    if not token:
+        user_data = get_test_data("user", {})
+        response = {
+            "user": user_data
+        }
+        print(f"Returning user data (no token): {response}")
+        return response
+
+    # Проверяем статус пользователя
+    status = check_premium_status(token)
+
+    if not status["valid"]:
+        # Вместо ошибки возвращаем базовые данные
+        user_data = get_test_data("user", {})
+        response = {
+            "user": user_data
+        }
+        print(f"Returning user data (invalid token): {response}")
+        return response
+
+    # Возвращаем данные в том же формате, что и официальный сервер
+    user_data = get_test_data("user", {})
+    response = {
+        "user": user_data
+    }
+    print(f"Returning user data: {response}")
+    return response
+
+
+@app.post("/api/users/backup/import")
+async def users_backup_import(data: dict, token: str = Header(...)):
+    return {"status": "ok", "imported": True}
+
+
+# --- NOTICE ---
+@app.get("/api/notice/all")
+def get_notice_all(token: str = Header(...)):
+    return {"notices": get_test_data("notices", [{"id": 1, "title": "Test Notice", "message": "Test"}])}
+
+
+# --- PERSON LIST ---
+@app.get("/api/person/list")
+def get_person_list(token: Optional[str] = Header(None)):
+    # Если токен не предоставлен, возвращаем пустой список
+    if not token:
+        return {
+            "secuses": True,
+            "results": []
+        }
+
+    # Проверяем премиум статус для списка персон
+    status = check_premium_status(token)
+    if not status["valid"]:
+        # Вместо ошибки возвращаем пустой список
+        return {
+            "secuses": True,
+            "results": []
+        }
+    if not status["premium"]:
+        # Вместо ошибки возвращаем пустой список
+        return {
+            "secuses": True,
+            "results": []
+        }
+
+    return {
+        "secuses": True,
+        "results": get_test_data("person_list", [])
+    }
+
+
+# --- METRIC ---
+@app.get("/api/metric/unic")
+def get_metric_unic(platform: str = Query(...), uid: str = Query(...)):
+    return {"status": "ok", "metric": "recorded"}
+
+
+# --- IPTV ---
+@app.get("/api/iptv/channels")
+def get_iptv_channels(token: str = Header(None)):
+    iptv_data = get_test_data("iptv", {})
+    return {"channels": iptv_data.get("channels", [])}
+
+
+@app.get("/api/iptv/playlists")
+def get_iptv_playlists(token: str = Header(None)):
+    iptv_data = get_test_data("iptv", {})
+    return {"playlists": iptv_data.get("playlists", [])}
+
+
+# --- NEW ENDPOINTS FROM ITERATIVE SEARCH ---
+
+@app.get("/api/checker")
+def get_checker():
+    """Mirror checker endpoint"""
+    return get_test_data("checker", {})
+
+
+@app.get("/api/reset")
+def reset_account():
+    """Reset account data - for development purposes"""
+    return get_test_data("reset", {
+        "status": "ok",
+        "message": "Account reset. Please clear localStorage and reload page.",
+        "clear_storage": [
+            "account",
+            "account_user",
+            "account_email",
+            "account_notice",
+            "account_bookmarks"
+        ]
+    })
+
+
+@app.get("/plugin/sport")
+async def get_sport_plugin():
+    """Serve sport plugin"""
+    return JSONResponse(
+        content="// Sport plugin stub",
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+
+@app.get("/plugin/vast")
+async def get_vast_plugin():
+    """Serve vast plugin"""
+    return JSONResponse(
+        content="// Vast plugin stub",
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=3600"}
+    )
+
+
+@app.get("/blocked")
+async def get_blocked():
+    """Get blocked status"""
+    return {"blocked": False}
+
+
+@app.get("/tmdb/blocked")
+async def get_tmdb_blocked():
+    """Get TMDB blocked status"""
+    return []  # Возвращаем пустой массив для dcma
+
+
+@app.get("/tmdb/watch")
+async def get_tmdb_watch(id: str = Query(...), cat: str = Query(...)):
+    """Get TMDB watch data"""
+    return {"status": "ok", "id": id, "category": cat}
+
+
+# --- TMDB PROXY ENDPOINTS ---
+@app.get("/apitmdb./{path:path}")
+async def tmdb_api_proxy(path: str, request: Request):
+    """Proxy for TMDB API requests"""
+    import httpx
+
+    try:
+        # Собираем параметры запроса
+        params = dict(request.query_params)
+
+        # Добавляем API ключ TMDB
+        params["api_key"] = TMDB_API_KEY
+
+        # Формируем URL для TMDB API
+        tmdb_url = f"{TMDB_BASE_URL}/{path}"
+
+        print(f"TMDB API Proxy: {tmdb_url}")
+        print(f"Params: {params}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(tmdb_url, params=params)
+
+            if response.status_code == 200:
+                return JSONResponse(
+                    content=response.json(),
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+            else:
+                print(f"TMDB API error: {response.status_code}")
+                return JSONResponse(
+                    content={"error": "TMDB API error", "status": response.status_code},
+                    status_code=response.status_code
+                )
+
+    except Exception as e:
+        print(f"Error proxying to TMDB: {e}")
+        return JSONResponse(
+            content={"error": "Proxy error", "message": str(e)},
+            status_code=500
+        )
+
+
+@app.get("/imagetmdb./{path:path}")
+async def tmdb_image_proxy(path: str, request: Request):
+    """Proxy for TMDB image requests"""
+    import httpx
+
+    try:
+        # Формируем URL для изображения TMDB
+        image_url = f"https://image.tmdb.org/t/p/{path}"
+
+        print(f"TMDB Image Proxy: {image_url}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(image_url)
+
+            if response.status_code == 200:
+                return Response(
+                    content=response.content,
+                    media_type=response.headers.get("content-type", "image/jpeg"),
+                    headers={"Cache-Control": "public, max-age=86400"}  # Кэшируем изображения на 24 часа
+                )
+            else:
+                print(f"TMDB image error: {response.status_code}")
+                return JSONResponse(
+                    content={"error": "Image not found"},
+                    status_code=404
+                )
+
+    except Exception as e:
+        print(f"Error proxying image from TMDB: {e}")
+        return JSONResponse(
+            content={"error": "Image proxy error", "message": str(e)},
+            status_code=500
+        )
+
+
+# --- UNIFIED TMDB HANDLER ---
+async def handle_tmdb_request(path: str, params: dict, request: Request):
+    """Unified handler for all TMDB requests"""
+    import httpx
+
+    try:
+        # Специальная обработка для /blocked
+        if path == "blocked":
+            return []
+
+        # Специальная обработка для top/hundred и top/fire
+        if path.startswith("top/hundred/") or path.startswith("top/fire/"):
+            # Возвращаем заглушку для этих специальных путей
+            return {
+                "page": 1,
+                "results": [
+                    {"id": 1, "title": f"Top {path.split('/')[-1]} Item 1", "type": path.split('/')[-1]},
+                    {"id": 2, "title": f"Top {path.split('/')[-1]} Item 2", "type": path.split('/')[-1]},
+                    {"id": 3, "title": f"Top {path.split('/')[-1]} Item 3", "type": path.split('/')[-1]}
+                ],
+                "total_pages": 1,
+                "total_results": 3
+            }
+
+        # Специальная обработка для collections
+        if path.startswith("collections/"):
+            collection_id = path.split("/")[1]
+            return {
+                "page": 1,
+                "results": [
+                    {"id": 1, "title": f"Collection {collection_id} Item 1", "type": "movie"},
+                    {"id": 2, "title": f"Collection {collection_id} Item 2", "type": "tv"}
+                ],
+                "total_pages": 1,
+                "total_results": 2
+            }
+
+        # Обрабатываем специальные параметры Lampa
+        if "cat" in params and "sort" in params:
+            cat = params.get("cat", "movie")
+            sort = params.get("sort", "top")
+            genre = params.get("genre", "")
+            page = params.get("page", "1")
+            airdate = params.get("airdate", "")
+            vote = params.get("vote", "")
+            uhd = params.get("uhd", "")
+
+            # Формируем правильный TMDB API запрос
+            if cat == "movie":
+                tmdb_url = "https://api.themoviedb.org/3/discover/movie"
+                tmdb_params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "ru",
+                    "page": page,
+                    "with_genres": genre if genre else None,
+                    "sort_by": "popularity.desc" if sort == "top" else "release_date.desc"
+                }
+
+                # Добавляем фильтры по дате
+                if airdate:
+                    if "-" in airdate:
+                        # Диапазон дат
+                        start_year, end_year = airdate.split("-")
+                        tmdb_params["primary_release_date.gte"] = f"{start_year}-01-01"
+                        tmdb_params["primary_release_date.lte"] = f"{end_year}-12-31"
+                    else:
+                        # Один год
+                        tmdb_params["primary_release_year"] = airdate
+
+                # Добавляем фильтры по рейтингу
+                if vote and "-" in vote:
+                    min_vote, max_vote = vote.split("-")
+                    tmdb_params["vote_average.gte"] = min_vote
+                    tmdb_params["vote_average.lte"] = max_vote
+
+                # Убираем None значения
+                tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
+
+            else:  # TV
+                tmdb_url = "https://api.themoviedb.org/3/discover/tv"
+                tmdb_params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "ru",
+                    "page": page,
+                    "with_genres": genre if genre else None,
+                    "sort_by": "popularity.desc" if sort == "top" else "first_air_date.desc"
+                }
+
+                # Добавляем фильтры по дате
+                if airdate:
+                    if "-" in airdate:
+                        # Диапазон дат
+                        start_year, end_year = airdate.split("-")
+                        tmdb_params["first_air_date.gte"] = f"{start_year}-01-01"
+                        tmdb_params["first_air_date.lte"] = f"{end_year}-12-31"
+                    else:
+                        # Один год
+                        tmdb_params["first_air_date_year"] = airdate
+
+                # Добавляем фильтры по рейтингу
+                if vote and "-" in vote:
+                    min_vote, max_vote = vote.split("-")
+                    tmdb_params["vote_average.gte"] = min_vote
+                    tmdb_params["vote_average.lte"] = max_vote
+
+                # Убираем None значения
+                tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
+        else:
+            # Обычный прокси для других запросов
+            if "api_key" not in params:
+                params["api_key"] = TMDB_API_KEY
+
+            tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            tmdb_params = params
+
+        print(f"TMDB Request: {tmdb_url}")
+        print(f"TMDB Params: {tmdb_params}")
+
+        async with httpx.AsyncClient() as client:
+            response = await client.get(tmdb_url, params=tmdb_params)
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"TMDB API error: {response.status_code}")
+                return {"error": "TMDB API error", "status": response.status_code}
+
+    except Exception as e:
+        print(f"Error in TMDB handler: {e}")
+        return {"error": "TMDB handler error", "message": str(e)}
+
+
+@app.get("/tmdb/{path:path}")
+async def tmdb_proxy(path: str, request: Request):
+    """Main TMDB proxy endpoint"""
+    params = dict(request.query_params)
+    result = await handle_tmdb_request(path, params, request)
+
+    if "error" in result:
+        return JSONResponse(
+            content=result,
+            status_code=500
+        )
+    else:
+        return JSONResponse(
+            content=result,
+            status_code=200,
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+
+
+@app.get("/{path:path}")
+async def catch_all_subdomains(path: str, request: Request):
+    """Catch all subdomain requests"""
+    import httpx
+
+    # Handle geo subdomain
+    if path.startswith("geo."):
+        return {"geo": "stub"}
+
+    # Handle apitmdb subdomain
+    if path.startswith("apitmdb.") or "apitmdb." in str(request.url):
+        # Проксируем запросы к TMDB API
+        try:
+            # Убираем префикс apitmdb. из пути если есть
+            tmdb_path = path.replace("apitmdb.", "") if path.startswith("apitmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Добавляем API ключ TMDB
+            params["api_key"] = TMDB_API_KEY
+
+            # Формируем URL для TMDB API
+            tmdb_url = f"https://api.themoviedb.org/{tmdb_path}"
+
+            print(f"Proxying to TMDB (GET): {tmdb_url}")
+            print(f"Params: {params}")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(tmdb_url, params=params)
+
+                if response.status_code == 200:
+                    return JSONResponse(
+                        content=response.json(),
+                        status_code=200,
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    print(f"TMDB API error: {response.status_code}")
+                    return JSONResponse(
+                        content={"error": "TMDB API error", "status": response.status_code},
+                        status_code=response.status_code
+                    )
+
+        except Exception as e:
+            print(f"Error proxying to TMDB: {e}")
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    # Handle imagetmdb subdomain
+    if path.startswith("imagetmdb.") or "imagetmdb." in str(request.url):
+        # Проксируем запросы к изображениям TMDB
+        try:
+            # Убираем префикс imagetmdb. из пути если есть
+            image_path = path.replace("imagetmdb.", "") if path.startswith("imagetmdb.") else path
+
+            # Формируем URL для изображения TMDB
+            image_url = f"https://image.tmdb.org/t/p/{image_path}"
+
+            print(f"Proxying image from TMDB (GET): {image_url}")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+
+                if response.status_code == 200:
+                    return Response(
+                        content=response.content,
+                        media_type=response.headers.get("content-type", "image/jpeg"),
+                        headers={"Cache-Control": "public, max-age=86400"}  # Кэшируем изображения на 24 часа
+                    )
+                else:
+                    print(f"TMDB image error: {response.status_code}")
+                    return JSONResponse(
+                        content={"error": "Image not found"},
+                        status_code=404
+                    )
+
+        except Exception as e:
+            print(f"Error proxying image from TMDB: {e}")
+            return JSONResponse(
+                content={"error": "Image proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    # Handle tmdb subdomain
+    if path.startswith("tmdb.") or "tmdb." in str(request.url):
+        try:
+            # Убираем префикс tmdb. из пути если есть
+            tmdb_path = path.replace("tmdb.", "") if path.startswith("tmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Используем унифицированный обработчик
+            result = await handle_tmdb_request(tmdb_path, params, request)
+
+            if "error" in result:
+                return JSONResponse(
+                    content=result,
+                    status_code=500
+                )
+            else:
+                return JSONResponse(
+                    content=result,
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+
+        except Exception as e:
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    return {"status": "not_found", "path": path}
+
+
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def catch_all_api_routes(path: str, request: Request):
+    """Catch all API routes that weren't handled by specific endpoints"""
+    import httpx
+
+    # Handle subdomain requests
+    if path.startswith("geo."):
+        return {"geo": "stub"}
+
+    if path.startswith("apitmdb.") or "apitmdb." in str(request.url):
+        # Проксируем запросы к TMDB API
+        try:
+            # Убираем префикс apitmdb. из пути если есть
+            tmdb_path = path.replace("apitmdb.", "") if path.startswith("apitmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Добавляем API ключ TMDB
+            params["api_key"] = TMDB_API_KEY
+
+            # Формируем URL для TMDB API
+            tmdb_url = f"https://api.themoviedb.org/{tmdb_path}"
+
+            print(f"Proxying to TMDB: {tmdb_url}")
+            print(f"Params: {params}")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(tmdb_url, params=params)
+
+                if response.status_code == 200:
+                    return JSONResponse(
+                        content=response.json(),
+                        status_code=200,
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+                else:
+                    print(f"TMDB API error: {response.status_code}")
+                    return JSONResponse(
+                        content={"error": "TMDB API error", "status": response.status_code},
+                        status_code=response.status_code
+                    )
+
+        except Exception as e:
+            print(f"Error proxying to TMDB: {e}")
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    if path.startswith("imagetmdb.") or "imagetmdb." in str(request.url):
+        # Проксируем запросы к изображениям TMDB
+        try:
+            # Убираем префикс imagetmdb. из пути если есть
+            image_path = path.replace("imagetmdb.", "") if path.startswith("imagetmdb.") else path
+
+            # Формируем URL для изображения TMDB
+            image_url = f"https://image.tmdb.org/t/p/{image_path}"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+
+                if response.status_code == 200:
+                    return Response(
+                        content=response.content,
+                        media_type=response.headers.get("content-type", "image/jpeg"),
+                        headers={"Cache-Control": "public, max-age=86400"}  # Кэшируем изображения на 24 часа
+                    )
+                else:
+                    print(f"TMDB image error: {response.status_code}")
+                    return JSONResponse(
+                        content={"error": "Image not found"},
+                        status_code=404
+                    )
+
+        except Exception as e:
+            print(f"Error proxying image from TMDB: {e}")
+            return JSONResponse(
+                content={"error": "Image proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    if path.startswith("tmdb.") or "tmdb." in str(request.url):
+        try:
+            # Убираем префикс tmdb. из пути если есть
+            tmdb_path = path.replace("tmdb.", "") if path.startswith("tmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Используем унифицированный обработчик
+            result = await handle_tmdb_request(tmdb_path, params, request)
+
+            if "error" in result:
+                return JSONResponse(
+                    content=result,
+                    status_code=500
+                )
+            else:
+                return JSONResponse(
+                    content=result,
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+
+        except Exception as e:
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    return {"status": "not_found", "path": path}
+
+
+@app.get("/api/device/qr")
+def get_device_qr():
+    """Get QR code for device addition"""
+    return get_test_data("device_qr", {
+        "qr_url": "/img/other/qr-add-device.png",
+        "site_url": "/add",
+        "code_length": 6
+    })
+
+
+@app.get("/img/other/qr-add-device.png")
+async def get_qr_image():
+    """Serve QR code image"""
+    try:
+        return FileResponse(
+            "static/img/other/qr-add-device.png",
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+    except FileNotFoundError:
+        # Если файл не найден, возвращаем пустой ответ
+        return JSONResponse(
+            status_code=404,
+            content={"error": "QR image not found"}
+        )
+
+
+@app.get("/img/profiles/{profile_icon}.png")
+async def get_profile_image(profile_icon: str):
+    """Serve profile icon image"""
+    try:
+        # Создаем заглушку для изображения профиля
+        return FileResponse(
+            "static/img/other/qr-add-device.png",  # Используем то же изображение как заглушку
+            media_type="image/png",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+    except FileNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Profile image not found"}
+        )
+
+
+@app.get("/api/collections/liked")
+def get_collections_liked(token: str = Header(...)):
+    """Get liked collections"""
+    return {"results": get_test_data("collections_liked", [])}
+
+
+@app.get("/api/collections/view/{url}")
+def get_collections_view(url: str, page: int = Query(1), token: str = Header(...)):
+    """Get collection view by URL"""
+    key = f"{url}_{page}"
+    collections_view = get_test_data("collections_view", {})
+    if key not in collections_view:
+        collections_view[key] = {
+            "page": page,
+            "results": [
+                {"id": 1, "title": f"Collection Item {page}-1", "type": "movie"},
+                {"id": 2, "title": f"Collection Item {page}-2", "type": "tv"}
+            ],
+            "total_pages": 3
+        }
+        update_test_data("collections_view", collections_view)
+    return collections_view[key]
+
+
+@app.get("/api/iptv/time")
+def get_iptv_time(token: str = Header(None)):
+    """Get IPTV current time"""
+    iptv_data = get_test_data("iptv", {})
+    return iptv_data.get("time", {})
+
+
+@app.get("/api/iptv/program/{channel_id}/{time}")
+def get_iptv_program(channel_id: str, time: str, full: bool = Query(False), token: str = Header(None)):
+    """Get IPTV program for channel and time"""
+    key = f"{channel_id}_{time}"
+    iptv_data = get_test_data("iptv", {})
+    program = iptv_data.get("program", {})
+    if key not in program:
+        program[key] = {
+            "channel_id": channel_id,
+            "time": int(time),
+            "programs": [
+                {"title": f"Program {channel_id}-1", "start": int(time), "end": int(time) + 3600},
+                {"title": f"Program {channel_id}-2", "start": int(time) + 3600, "end": int(time) + 7200}
+            ]
+        }
+        iptv_data["program"] = program
+        update_test_data("iptv", iptv_data)
+    return program[key]
+
+
+# --- DEBUG ENDPOINT ---
+@app.post("/api/debug")
+async def debug_endpoint(request: Request):
+    """Debug endpoint to see what data is being sent"""
+    try:
+        form_data = await request.form()
+        body_text = await request.body()
+
+        return {
+            "form_data": dict(form_data),
+            "body_text": body_text.decode() if body_text else None,
+            "headers": dict(request.headers),
+            "method": request.method,
+            "url": str(request.url)
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
+# --- SOCKET ENDPOINTS ---
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for real-time communication"""
+    await websocket.accept()
+
+    try:
+        while True:
+            # Получаем сообщение от клиента
+            data = await websocket.receive_text()
+            message = json.loads(data)
+
+            print(f"WebSocket received: {message}")
+
+            # Обрабатываем разные типы сообщений
+            if message.get("method") == "check_token":
+                # Проверяем токен и премиум статус
+                token = message.get("data", {}).get("token")
+                print(f"WebSocket check_token: token={token}")
+                if token:
+                    status = check_premium_status(token)
+                    print(f"WebSocket check_token: status={status}")
+                    response = {
+                        "method": "check_token",
+                        "status": "valid" if status["valid"] else "invalid",
+                        "data": {
+                            "valid": status["valid"],
+                            "premium": status["premium"],
+                            "premium_expiry": status["premium_expiry"],
+                            "current_time": status["current_time"]
+                        }
+                    }
+                else:
+                    response = {
+                        "method": "check_token",
+                        "status": "invalid",
+                        "data": {"valid": False, "premium": False}
+                    }
+
+                await websocket.send_text(json.dumps(response))
+
+            elif message.get("method") == "start":
+                # Обрабатываем сообщение start с правильным премиум статусом
+                account = message.get("account", {})
+                token = account.get("token")
+                print(f"WebSocket start: token={token}")
+
+                if token:
+                    status = check_premium_status(token)
+                    print(f"WebSocket start: status={status}")
+                    response = {
+                        "method": "start",
+                        "status": "ok",
+                        "data": {
+                            "valid": status["valid"],
+                            "premium": status["premium"],
+                            "premium_expiry": status["premium_expiry"],
+                            "current_time": status["current_time"],
+                            "account": {
+                                "secuses": True,
+                                "email": "igor.tonin@inbox.ru",
+                                "id": 148608,
+                                "token": token,
+                                "profile": {
+                                    "id": 153918,
+                                    "cid": 148608,
+                                    "name": "Общий",
+                                    "main": 1,
+                                    "icon": "l_1"
+                                }
+                            }
+                        }
+                    }
+                else:
+                    response = {
+                        "method": "start",
+                        "status": "error",
+                        "data": {"valid": False, "premium": False, "premium_expiry": 0,
+                                 "current_time": int(time.time())}
+                    }
+
+                await websocket.send_text(json.dumps(response))
+
+            elif message.get("method") == "devices":
+                # Возвращаем список устройств
+                response = {
+                    "method": "devices",
+                    "data": get_test_data("devices", [])
+                }
+                await websocket.send_text(json.dumps(response))
+
+            else:
+                # Эхо для других сообщений
+                response = {
+                    "method": "echo",
+                    "data": message
+                }
+                await websocket.send_text(json.dumps(response))
+
+    except WebSocketDisconnect:
+        print("WebSocket disconnected")
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+
+
+# --- UNIVERSAL API FALLBACK ---
+@app.api_route("/api/{path:path}", methods=["GET", "POST"])
+async def fallback_api(path: str, request: Request, token: Optional[str] = Header(None)):
+    # Не обрабатываем известные эндпоинты
+    known_endpoints = [
+        "profiles/all", "device/add", "bookmarks/all", "bookmarks/add", "bookmarks/clear",
+        "notifications/all", "notifications/add", "lampa/logs/write", "person/subscribe",
+        "person/unsubscribe", "discuss/get", "discuss/add", "discuss/voite", "reactions/get",
+        "reactions/add", "collections/list", "trailers/short/trailers", "timeline/all",
+        "feed/all", "ad/stat", "ad/all", "ad/vast", "adv/log", "payment/event_prime",
+        "ai/generate/facts", "ai/generate/recommend", "ai/search", "plugins/blacklist",
+        "plugins/all", "extensions/list", "extensions/status", "plugins/status",
+        "premium/status", "premium/status/debug", "premium/check", "account/status",
+        "users/get", "users/backup/import", "notice/all", "person/list",
+        "metric/unic", "iptv/channels", "iptv/playlists", "checker", "device/qr",
+        "collections/liked", "collections/view", "iptv/time", "iptv/program"
+    ]
+
+    if path in known_endpoints:
+        return JSONResponse({"status": "endpoint_exists", "path": path, "method": request.method})
+
+    return JSONResponse({"status": "stub", "path": path, "method": request.method})
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000) 

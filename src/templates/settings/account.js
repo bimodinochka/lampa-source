@@ -59,7 +59,7 @@ let html = `<div>
         <div class="settings-param__value">#{settings_cub_backup_descr}</div>
     </div>
 
-    <div class="settings-param-title"><span>CUB Premium</span></div>
+    <div class="settings-param-title"><span>TUB Premium</span></div>
 
     <div class="selectbox-item selector selectbox-item--checkbox settings--account-premium" data-static="true">
         <div class="selectbox-item__title">#{settings_cub_sync_filters}</div>

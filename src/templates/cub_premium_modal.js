@@ -17,7 +17,7 @@ let html = `<div class="cub-premium cub-premium--detail">
         <rect x="52.8914" y="130.995" width="10.262" height="2.70052" rx="1.35026" transform="rotate(-90 52.8914 130.995)" fill="#D8C39A"/>
         </svg>
 
-        <span>CUB Premium</span>
+        <span>TUB Premium</span>
     </div>
     <div class="cub-premium__descr">
         #{account_premium}

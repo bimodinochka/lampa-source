@@ -481,7 +481,7 @@ select('poster_size',{
     'w200': '#{settings_param_poster_quality_low}',
     'w300': '#{settings_param_poster_quality_average}',
     'w500': '#{settings_param_poster_quality_high}'
-},'w200')
+},'w500')
 
 select('parser_torrent_type',{
     'jackett': 'Jackett',
@@ -536,7 +536,7 @@ select('screensaver_time',{
     '2': '2',
     '5': '5',
     '10': '10',
-},'5')
+},'10')
 
 
 select('parse_lang',{
@@ -607,7 +607,7 @@ select('keyboard_type', {
 select('card_interfice_type', {
     'old': '#{settings_param_card_interface_old}',
     'new': '#{settings_param_card_interface_new}'
-}, 'new')
+}, 'old')
 
 select('glass_opacity', {
     'easy': '#{settings_param_glass_easy}',
@@ -676,7 +676,7 @@ select('cub_domain', mirrors_select, Manifest.cub_domain)
 trigger('animation',true)
 trigger('background',true)
 trigger('torrserver_savedb',false)
-trigger('torrserver_preload', false)
+trigger('torrserver_preload', true)
 trigger('parser_use',false)
 trigger('cloud_use',false)
 trigger('account_use',false)
@@ -703,7 +703,7 @@ trigger('black_style', false)
 trigger('hide_outside_the_screen', true)
 trigger('card_interfice_cover', true)
 trigger('card_interfice_reactions', true)
-trigger('cache_images', false)
+trigger('cache_images', true)
 trigger('interface_sound_play', false)
 
 

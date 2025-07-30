@@ -99,7 +99,7 @@ function init(){
     })
 
     if(!window.lampa_settings.disable_features.dmca){
-        network.silent(Utils.protocol() + 'tmdb.'+Manifest.cub_domain+'/blocked',(dcma)=>{
+        network.silent(Utils.protocol() + Manifest.cub_domain+'/tmdb/blocked',(dcma)=>{
             window.lampa_settings.dcma = dcma
         })
     }
