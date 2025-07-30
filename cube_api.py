@@ -904,15 +904,69 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                 "total_results": 2
             }
 
+        # Подготавливаем параметры для TMDB
+        tmdb_params = dict(params)
+        
+        # Добавляем API ключ если его нет
+        if "api_key" not in tmdb_params:
+            tmdb_params["api_key"] = TMDB_API_KEY
+            
+        # Добавляем язык если его нет
+        if "language" not in tmdb_params:
+            tmdb_params["language"] = "ru"
+            
+        # Обрабатываем множественные языки
+        if "langs" in tmdb_params:
+            langs = tmdb_params.pop("langs")
+            if isinstance(langs, list):
+                tmdb_params["language"] = ",".join(langs)
+            elif isinstance(langs, str):
+                tmdb_params["language"] = langs
+            
         # Обрабатываем специальные параметры Lampa
-        if "cat" in params and "sort" in params:
-            cat = params.get("cat", "movie")
-            sort = params.get("sort", "top")
-            genre = params.get("genre", "")
-            page = params.get("page", "1")
-            airdate = params.get("airdate", "")
-            vote = params.get("vote", "")
-            uhd = params.get("uhd", "")
+        if "genres" in tmdb_params:
+            tmdb_params["with_genres"] = tmdb_params.pop("genres")
+            
+        # Обрабатываем фильтры
+        if "filter" in tmdb_params:
+            filter_params = tmdb_params.pop("filter")
+            if isinstance(filter_params, dict):
+                tmdb_params.update(filter_params)
+                
+        # Обрабатываем параметр query для поиска
+        if "query" in tmdb_params and path.startswith("search/"):
+            # Для поисковых запросов query должен быть в корне параметров
+            tmdb_params["query"] = tmdb_params["query"]
+            
+        # Обрабатываем дополнительные параметры из cub.js
+        if "keywords" in tmdb_params:
+            tmdb_params["with_keywords"] = tmdb_params.pop("keywords")
+            
+        if "watch_region" in tmdb_params:
+            tmdb_params["watch_region"] = tmdb_params["watch_region"]
+            
+        if "watch_providers" in tmdb_params:
+            tmdb_params["with_watch_providers"] = tmdb_params.pop("watch_providers")
+            
+        if "networks" in tmdb_params:
+            tmdb_params["with_networks"] = tmdb_params.pop("networks")
+            
+        if "sort_by" in tmdb_params:
+            tmdb_params["sort_by"] = tmdb_params["sort_by"]
+            
+        # Обрабатываем параметр append_to_response для полных запросов
+        if "append_to_response" in tmdb_params:
+            tmdb_params["append_to_response"] = tmdb_params["append_to_response"]
+
+        # Обрабатываем специальные параметры для discover запросов
+        if "cat" in tmdb_params and "sort" in tmdb_params:
+            cat = tmdb_params.get("cat", "movie")
+            sort = tmdb_params.get("sort", "top")
+            genre = tmdb_params.get("genre", "")
+            page = tmdb_params.get("page", "1")
+            airdate = tmdb_params.get("airdate", "")
+            vote = tmdb_params.get("vote", "")
+            uhd = tmdb_params.get("uhd", "")
 
             # Формируем правильный TMDB API запрос
             if cat == "movie":
@@ -924,6 +978,10 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                     "with_genres": genre if genre else None,
                     "sort_by": "popularity.desc" if sort == "top" else "release_date.desc"
                 }
+
+                # Добавляем фильтр для фильмов в кинотеатрах
+                if sort == "now_playing":
+                    tmdb_params["with_release_type"] = "1"  # Только в кинотеатрах
 
                 # Добавляем фильтры по дате
                 if airdate:
@@ -942,10 +1000,14 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                     tmdb_params["vote_average.gte"] = min_vote
                     tmdb_params["vote_average.lte"] = max_vote
 
+                # Добавляем фильтр для высокого качества (uhd)
+                if uhd:
+                    tmdb_params["vote_average.gte"] = "7.0"  # Минимальный рейтинг для высокого качества
+
                 # Убираем None значения
                 tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
 
-            else:  # TV
+            elif cat == "tv":
                 tmdb_url = "https://api.themoviedb.org/3/discover/tv"
                 tmdb_params = {
                     "api_key": TMDB_API_KEY,
@@ -954,6 +1016,10 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                     "with_genres": genre if genre else None,
                     "sort_by": "popularity.desc" if sort == "top" else "first_air_date.desc"
                 }
+
+                # Добавляем фильтр для сериалов в эфире
+                if sort == "airing":
+                    tmdb_params["with_status"] = "0"  # Возвращающиеся сериалы
 
                 # Добавляем фильтры по дате
                 if airdate:
@@ -972,15 +1038,125 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                     tmdb_params["vote_average.gte"] = min_vote
                     tmdb_params["vote_average.lte"] = max_vote
 
+                # Добавляем фильтр для высокого качества (uhd)
+                if uhd:
+                    tmdb_params["vote_average.gte"] = "7.0"  # Минимальный рейтинг для высокого качества
+
                 # Убираем None значения
                 tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
-        else:
-            # Обычный прокси для других запросов
-            if "api_key" not in params:
-                params["api_key"] = TMDB_API_KEY
+                
+            elif cat == "anime":
+                # Для аниме используем TV API с фильтрами
+                tmdb_url = "https://api.themoviedb.org/3/discover/tv"
+                tmdb_params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "ru",
+                    "page": page,
+                    "with_genres": "16",  # Анимация
+                    "with_original_language": "ja",  # Японский язык
+                    "sort_by": "popularity.desc" if sort == "top" else "first_air_date.desc"
+                }
 
-            tmdb_url = f"https://api.themoviedb.org/3/{path}"
-            tmdb_params = params
+                # Добавляем фильтр для аниме в эфире
+                if sort == "airing":
+                    tmdb_params["with_status"] = "0"  # Возвращающиеся сериалы
+
+                # Добавляем фильтры по дате
+                if airdate:
+                    if "-" in airdate:
+                        # Диапазон дат
+                        start_year, end_year = airdate.split("-")
+                        tmdb_params["first_air_date.gte"] = f"{start_year}-01-01"
+                        tmdb_params["first_air_date.lte"] = f"{end_year}-12-31"
+                    else:
+                        # Один год
+                        tmdb_params["first_air_date_year"] = airdate
+
+                # Добавляем фильтры по рейтингу
+                if vote and "-" in vote:
+                    min_vote, max_vote = vote.split("-")
+                    tmdb_params["vote_average.gte"] = min_vote
+                    tmdb_params["vote_average.lte"] = max_vote
+
+                # Добавляем фильтр для высокого качества (uhd)
+                if uhd:
+                    tmdb_params["vote_average.gte"] = "7.0"  # Минимальный рейтинг для высокого качества
+
+                # Убираем None значения
+                tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
+            else:
+                # Для других категорий используем обычный прокси
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+        else:
+            # Обрабатываем поисковые запросы для аниме
+            if path == "search/anime":
+                # Для поиска аниме используем поиск по TV с фильтрами
+                tmdb_url = "https://api.themoviedb.org/3/search/tv"
+                tmdb_params["with_genres"] = "16"  # Анимация
+                tmdb_params["with_original_language"] = "ja"  # Японский язык
+            elif path == "search/movie":
+                # Поиск фильмов
+                tmdb_url = "https://api.themoviedb.org/3/search/movie"
+            elif path == "search/tv":
+                # Поиск сериалов
+                tmdb_url = "https://api.themoviedb.org/3/search/tv"
+            elif path == "search/person":
+                # Поиск актеров
+                tmdb_url = "https://api.themoviedb.org/3/search/person"
+            elif path == "movie/now_playing":
+                # Фильмы в кинотеатрах
+                tmdb_url = "https://api.themoviedb.org/3/movie/now_playing"
+            elif path == "trending/movie/day":
+                # Трендовые фильмы за день
+                tmdb_url = "https://api.themoviedb.org/3/trending/movie/day"
+            elif path == "trending/movie/week":
+                # Трендовые фильмы за неделю
+                tmdb_url = "https://api.themoviedb.org/3/trending/movie/week"
+            elif path == "trending/tv/week":
+                # Трендовые сериалы за неделю
+                tmdb_url = "https://api.themoviedb.org/3/trending/tv/week"
+            elif path == "movie/upcoming":
+                # Скоро выходящие фильмы
+                tmdb_url = "https://api.themoviedb.org/3/movie/upcoming"
+            elif path == "movie/popular":
+                # Популярные фильмы
+                tmdb_url = "https://api.themoviedb.org/3/movie/popular"
+            elif path == "movie/top_rated":
+                # Лучшие фильмы
+                tmdb_url = "https://api.themoviedb.org/3/movie/top_rated"
+            elif path == "tv/top_rated":
+                # Лучшие сериалы
+                tmdb_url = "https://api.themoviedb.org/3/tv/top_rated"
+            elif path.startswith("discover/"):
+                # Discover запросы
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.startswith("collection/"):
+                # Запросы к коллекциям
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.startswith("tv/") and "/season/" in path:
+                # Запросы к сезонам сериалов
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.startswith("movie/") and "/" in path and path.split("/")[-1].isdigit():
+                # Запросы к конкретным фильмам
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.startswith("tv/") and "/" in path and path.split("/")[-1].isdigit():
+                # Запросы к конкретным сериалам
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.endswith("/credits"):
+                # Запросы к актерам и съемочной группе
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.endswith("/recommendations"):
+                # Рекомендации
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.endswith("/similar"):
+                # Похожие фильмы/сериалы
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            elif path.endswith("/videos"):
+                # Видео (трейлеры, клипы)
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+            else:
+                # Обычный прокси для других запросов
+                tmdb_url = f"https://api.themoviedb.org/3/{path}"
 
         print(f"TMDB Request: {tmdb_url}")
         print(f"TMDB Params: {tmdb_params}")
