@@ -906,15 +906,15 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
 
         # Подготавливаем параметры для TMDB
         tmdb_params = dict(params)
-        
+
         # Добавляем API ключ если его нет
         if "api_key" not in tmdb_params:
             tmdb_params["api_key"] = TMDB_API_KEY
-            
+
         # Добавляем язык если его нет
         if "language" not in tmdb_params:
             tmdb_params["language"] = "ru"
-            
+
         # Обрабатываем множественные языки
         if "langs" in tmdb_params:
             langs = tmdb_params.pop("langs")
@@ -922,38 +922,38 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                 tmdb_params["language"] = ",".join(langs)
             elif isinstance(langs, str):
                 tmdb_params["language"] = langs
-            
+
         # Обрабатываем специальные параметры Lampa
         if "genres" in tmdb_params:
             tmdb_params["with_genres"] = tmdb_params.pop("genres")
-            
+
         # Обрабатываем фильтры
         if "filter" in tmdb_params:
             filter_params = tmdb_params.pop("filter")
             if isinstance(filter_params, dict):
                 tmdb_params.update(filter_params)
-                
+
         # Обрабатываем параметр query для поиска
         if "query" in tmdb_params and path.startswith("search/"):
             # Для поисковых запросов query должен быть в корне параметров
             tmdb_params["query"] = tmdb_params["query"]
-            
+
         # Обрабатываем дополнительные параметры из cub.js
         if "keywords" in tmdb_params:
             tmdb_params["with_keywords"] = tmdb_params.pop("keywords")
-            
+
         if "watch_region" in tmdb_params:
             tmdb_params["watch_region"] = tmdb_params["watch_region"]
-            
+
         if "watch_providers" in tmdb_params:
             tmdb_params["with_watch_providers"] = tmdb_params.pop("watch_providers")
-            
+
         if "networks" in tmdb_params:
             tmdb_params["with_networks"] = tmdb_params.pop("networks")
-            
+
         if "sort_by" in tmdb_params:
             tmdb_params["sort_by"] = tmdb_params["sort_by"]
-            
+
         # Обрабатываем параметр append_to_response для полных запросов
         if "append_to_response" in tmdb_params:
             tmdb_params["append_to_response"] = tmdb_params["append_to_response"]
@@ -1044,7 +1044,7 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
 
                 # Убираем None значения
                 tmdb_params = {k: v for k, v in tmdb_params.items() if v is not None}
-                
+
             elif cat == "anime":
                 # Для аниме используем TV API с фильтрами
                 tmdb_url = "https://api.themoviedb.org/3/discover/tv"
