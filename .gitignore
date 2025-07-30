@@ -42,3 +42,4 @@ dev.env
 .ropeproject/
 /.ropeproject
 /.ropeproject/
+/venv/
