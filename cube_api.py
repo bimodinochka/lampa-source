@@ -277,7 +277,7 @@ async def add_device(request: Request):
 
 # --- BOOKMARKS ---
 @app.get("/api/bookmarks/all")
-def get_bookmarks(token: str = Header(...)):
+def get_bookmarks(token: str = Header(...), category: Optional[str] = Query(None)):
     # Проверяем премиум статус для синхронизации закладок
     status = check_premium_status(token)
     if not status["valid"]:
@@ -285,7 +285,27 @@ def get_bookmarks(token: str = Header(...)):
     if not status["premium"]:
         raise HTTPException(status_code=402, detail="Premium required for bookmarks sync")
 
-    return {"bookmarks": get_test_data("bookmarks", [])}
+    # Добавляем поддержку категорий
+    bookmarks = get_test_data("bookmarks", [])
+    
+    if category:
+        bookmarks = [b for b in bookmarks if b.get("category") == category]
+    
+    return {"bookmarks": bookmarks}
+
+
+@app.get("/api/bookmarks/categories")
+def get_bookmark_categories(token: str = Header(...)):
+    # Новый эндпоинт для получения категорий
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for bookmarks sync")
+
+    return {
+        "categories": ["book", "like", "wath", "viewed", "scheduled", "continued", "thrown"]
+    }
 
 
 @app.post("/api/bookmarks/add")
@@ -562,42 +582,72 @@ async def payment_event_prime(data: dict, token: str = Header(None)):
 
 # --- AI ---
 @app.get("/api/ai/generate/facts/{card_id}/{card_type}")
-def ai_generate_facts(card_id: str, card_type: str, token: str = Header(...), profile: Optional[str] = Header(None)):
-    # Проверяем премиум статус для AI функций
-    status = check_premium_status(token)
-    if not status["valid"]:
-        raise HTTPException(status_code=403, detail="Invalid token")
-    if not status["premium"]:
-        raise HTTPException(status_code=402, detail="Premium required for AI features")
-
+async def ai_generate_facts(card_id: str, card_type: str, token: str = Header(None)):
+    """Generate AI facts for a card"""
+    if not check_premium_status(token):
+        raise HTTPException(status_code=403, detail="Premium required")
+    
+    # Get AI facts from test data
     key = f"{card_id}_{card_type}"
-    return get_test_data("ai_facts", {}).get(key, {"results": [], "status": "stub"})
-
+    ai_facts = test_data.get("ai_facts", {})
+    card_facts = ai_facts.get(key, {})
+    
+    if card_facts and "results" in card_facts:
+        return {"facts": [fact["fact"] for fact in card_facts["results"]]}
+    
+    # Fallback to mock data if not found
+    return {
+        "facts": [
+            f"AI generated fact 1 for {card_type} {card_id}",
+            f"AI generated fact 2 for {card_type} {card_id}",
+            f"AI generated fact 3 for {card_type} {card_id}"
+        ]
+    }
 
 @app.get("/api/ai/generate/recommend/{card_id}/{card_type}")
-def ai_generate_recommend(card_id: str, card_type: str, token: str = Header(...),
-                          profile: Optional[str] = Header(None)):
-    # Проверяем премиум статус для AI функций
-    status = check_premium_status(token)
-    if not status["valid"]:
-        raise HTTPException(status_code=403, detail="Invalid token")
-    if not status["premium"]:
-        raise HTTPException(status_code=402, detail="Premium required for AI features")
-
+async def ai_generate_recommendations(card_id: str, card_type: str, token: str = Header(None)):
+    """Generate AI recommendations for a card"""
+    if not check_premium_status(token):
+        raise HTTPException(status_code=403, detail="Premium required")
+    
+    # Get AI recommendations from test data
     key = f"{card_id}_{card_type}"
-    return get_test_data("ai_recommend", {}).get(key, {"results": [], "status": "stub"})
-
+    ai_recommend = test_data.get("ai_recommend", {})
+    card_recommendations = ai_recommend.get(key, {})
+    
+    if card_recommendations and "results" in card_recommendations:
+        return {"recommendations": card_recommendations["results"]}
+    
+    # Fallback to mock data if not found
+    return {
+        "recommendations": [
+            {"id": "rec1", "title": f"Recommended {card_type} 1", "type": card_type},
+            {"id": "rec2", "title": f"Recommended {card_type} 2", "type": card_type},
+            {"id": "rec3", "title": f"Recommended {card_type} 3", "type": card_type}
+        ]
+    }
 
 @app.get("/api/ai/search/{query}")
-def ai_search(query: str, token: str = Header(...), profile: Optional[str] = Header(None)):
-    # Проверяем премиум статус для AI функций
-    status = check_premium_status(token)
-    if not status["valid"]:
-        raise HTTPException(status_code=403, detail="Invalid token")
-    if not status["premium"]:
-        raise HTTPException(status_code=402, detail="Premium required for AI features")
-
-    return get_test_data("ai_search", {}).get(query, {"results": [], "status": "stub"})
+async def ai_search(query: str, token: str = Header(None)):
+    """AI search functionality"""
+    if not check_premium_status(token):
+        raise HTTPException(status_code=403, detail="Premium required")
+    
+    # Get AI search results from test data
+    ai_search_data = test_data.get("ai_search", {})
+    search_results = ai_search_data.get(query, {})
+    
+    if search_results and "results" in search_results:
+        return {"results": search_results["results"]}
+    
+    # Fallback to mock data if not found
+    return {
+        "results": [
+            {"id": "ai1", "title": f"AI result for: {query}", "type": "movie"},
+            {"id": "ai2", "title": f"AI result for: {query}", "type": "tv"},
+            {"id": "ai3", "title": f"AI result for: {query}", "type": "anime"}
+        ]
+    }
 
 
 # --- PLUGINS ---
@@ -678,6 +728,47 @@ def get_notice_all(token: str = Header(...)):
     return {"notices": get_test_data("notices", [{"id": 1, "title": "Test Notice", "message": "Test"}])}
 
 
+# --- TORRENTS ---
+@app.get("/api/torrents/all")
+def get_torrents(token: str = Header(...)):
+    # Проверяем премиум статус для торрентов
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for torrents")
+
+    return {"torrents": get_test_data("torrents", [])}
+
+
+@app.post("/api/torrents/add")
+async def add_torrent(torrent: dict, token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for torrents")
+
+    torrents = get_test_data("torrents", [])
+    torrents.append(torrent)
+    update_test_data("torrents", torrents)
+    return {"status": "ok", "torrent": torrent}
+
+
+@app.post("/api/torrents/remove")
+async def remove_torrent(torrent_id: str, token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    if not status["premium"]:
+        raise HTTPException(status_code=402, detail="Premium required for torrents")
+
+    torrents = get_test_data("torrents", [])
+    torrents = [t for t in torrents if t.get("id") != torrent_id]
+    update_test_data("torrents", torrents)
+    return {"status": "ok", "removed": True}
+
+
 # --- PERSON LIST ---
 @app.get("/api/person/list")
 def get_person_list(token: Optional[str] = Header(None)):
@@ -709,10 +800,88 @@ def get_person_list(token: Optional[str] = Header(None)):
     }
 
 
+# --- SEARCH HISTORY ---
+@app.get("/api/search/history")
+def get_search_history(token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    return {"history": get_test_data("search_history", [])}
+
+
+@app.post("/api/search/history/add")
+async def add_search_history(query: str, token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    history = get_test_data("search_history", [])
+    if query not in history:
+        history.insert(0, query)
+        history = history[:50]  # Ограничиваем 50 элементами
+        update_test_data("search_history", history)
+    
+    return {"status": "ok"}
+
+
+@app.post("/api/search/history/clear")
+async def clear_search_history(token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    update_test_data("search_history", [])
+    return {"status": "ok", "cleared": True}
+
+
 # --- METRIC ---
 @app.get("/api/metric/unic")
 def get_metric_unic(platform: str = Query(...), uid: str = Query(...)):
     return {"status": "ok", "metric": "recorded"}
+
+
+# --- SETTINGS ---
+@app.get("/api/settings/components")
+def get_settings_components(token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    return {"components": get_test_data("settings_components", [])}
+
+
+@app.post("/api/settings/components/add")
+async def add_settings_component(component: dict, token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    components = get_test_data("settings_components", [])
+    components.append(component)
+    update_test_data("settings_components", components)
+    return {"status": "ok", "component": component}
+
+
+@app.get("/api/settings/params")
+def get_settings_params(token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    return {"params": get_test_data("settings_params", [])}
+
+
+@app.post("/api/settings/params/add")
+async def add_settings_param(param: dict, token: str = Header(...)):
+    status = check_premium_status(token)
+    if not status["valid"]:
+        raise HTTPException(status_code=403, detail="Invalid token")
+    
+    params = get_test_data("settings_params", [])
+    params.append(param)
+    update_test_data("settings_params", params)
+    return {"status": "ok", "param": param}
 
 
 # --- IPTV ---
