@@ -6,6 +6,7 @@ from typing import Optional
 import json
 import os
 import time
+from datetime import datetime
 
 app = FastAPI(title="Cube API Replacement", version="1.0")
 
@@ -481,7 +482,7 @@ async def add_reaction(method_id: str, type: str, reaction: dict, token: str = H
 
 # --- COLLECTIONS ---
 @app.get("/api/collections/list")
-def get_collections(category: Optional[str] = None, token: str = Header(...)):
+def get_collections(category: Optional[str] = None, token: Optional[str] = Header(None)):
     collections = get_test_data("collections", [])
     if category:
         collections = [c for c in collections if c.get("category") == category]
@@ -789,6 +790,236 @@ async def get_tmdb_watch(id: str = Query(...), cat: str = Query(...)):
     return {"status": "ok", "id": id, "category": cat}
 
 
+@app.get("/")
+async def root_with_tmdb_params(request: Request):
+    """Handle root path with TMDB-like parameters"""
+    # Проверяем, есть ли параметры, которые указывают на TMDB запрос
+    params = dict(request.query_params)
+
+    if any(key in params for key in ["sort", "cat", "genre", "page", "query"]):
+        try:
+            # Формируем путь для TMDB на основе параметров
+            tmdb_path = ""
+            
+            # Обрабатываем параметр page
+            page = params.get("page", "1")
+            
+            # Обрабатываем параметр cat (категория)
+            cat = params.get("cat", "")
+            
+            # Обрабатываем параметр sort
+            sort = params.get("sort", "")
+            
+            # Обрабатываем параметр genre
+            genre = params.get("genre", "")
+            
+            # Обрабатываем параметр airdate
+            airdate = params.get("airdate", "")
+            
+            # Обрабатываем параметр vote
+            vote = params.get("vote", "")
+            
+            # Обрабатываем параметр uhd
+            uhd = params.get("uhd", "")
+            
+            # Определяем тип контента
+            if cat == "tv":
+                content_type = "tv"
+            elif cat == "anime":
+                content_type = "tv"
+                params["with_genres"] = "16"  # Анимация
+                params["with_original_language"] = "ja"  # Японский язык
+            else:
+                content_type = "movie"
+            
+            # Формируем путь для TMDB на основе параметров
+            if sort == "now_playing":
+                if content_type == "movie":
+                    tmdb_path = "movie/now_playing"
+                else:
+                    tmdb_path = "discover/tv"
+                    params["with_status"] = "0"
+            elif sort == "latest":
+                tmdb_path = f"discover/{content_type}"
+                if content_type == "movie":
+                    params["sort_by"] = "release_date.desc"
+                else:
+                    params["sort_by"] = "first_air_date.desc"
+            elif sort == "top":
+                tmdb_path = f"discover/{content_type}"
+                params["sort_by"] = "popularity.desc"
+            elif sort == "now":
+                tmdb_path = f"discover/{content_type}"
+                if content_type == "movie":
+                    params["sort_by"] = "release_date.desc"
+                    params["primary_release_year"] = str(datetime.now().year)
+                else:
+                    params["sort_by"] = "first_air_date.desc"
+                    params["first_air_date_year"] = str(datetime.now().year)
+            elif sort == "airing":
+                tmdb_path = "discover/tv"
+                params["with_status"] = "0"
+            elif sort == "update":
+                tmdb_path = "discover/tv"
+                params["with_status"] = "0"
+            else:
+                # По умолчанию используем discover
+                tmdb_path = f"discover/{content_type}"
+                params["sort_by"] = "popularity.desc"
+            
+            if "cat" in params:
+                if params["cat"] == "tv":
+                    tmdb_path = "discover/tv"
+                    if "sort" in params:
+                        if params["sort"] == "now_playing":
+                            params["with_status"] = "0"
+                        elif params["sort"] == "latest":
+                            params["sort_by"] = "first_air_date.desc"
+                        elif params["sort"] == "top":
+                            params["sort_by"] = "popularity.desc"
+                elif params["cat"] == "anime":
+                    tmdb_path = "discover/tv"
+                    params["with_genres"] = "16"
+                    params["with_original_language"] = "ja"
+            
+            if "genre" in params:
+                if "with_genres" not in params:
+                    params["with_genres"] = params["genre"]
+                del params["genre"]
+                
+                # Для жанров используем рейтинг вместо популярности
+                if "sort_by" in params and params["sort_by"] == "popularity.desc":
+                    params["sort_by"] = "vote_average.desc"
+                    params["vote_count.gte"] = "100"
+            
+            if "uhd" in params:
+                params["vote_average.gte"] = "7.0"
+                del params["uhd"]
+            
+            # Обрабатываем параметр airdate (дата выхода)
+            if "airdate" in params:
+                airdate = params["airdate"]
+                if "-" in airdate:
+                    # Диапазон дат
+                    start_year, end_year = airdate.split("-")
+                    if "cat" in params and params["cat"] == "tv":
+                        params["first_air_date.gte"] = f"{start_year}-01-01"
+                        params["first_air_date.lte"] = f"{end_year}-12-31"
+                    else:
+                        params["primary_release_date.gte"] = f"{start_year}-01-01"
+                        params["primary_release_date.lte"] = f"{end_year}-12-31"
+                else:
+                    # Один год
+                    if "cat" in params and params["cat"] == "tv":
+                        params["first_air_date_year"] = airdate
+                    else:
+                        params["primary_release_year"] = airdate
+                del params["airdate"]
+            
+            # Обрабатываем параметр vote (рейтинг)
+            if "vote" in params:
+                vote = params["vote"]
+                if "-" in vote:
+                    min_vote, max_vote = vote.split("-")
+                    params["vote_average.gte"] = min_vote
+                    params["vote_average.lte"] = max_vote
+                else:
+                    params["vote_average.gte"] = vote
+                del params["vote"]
+            
+            # Убираем параметры, которые не нужны для TMDB
+            for key in ["email"]:
+                if key in params:
+                    del params[key]
+            
+            if tmdb_path:
+                print(f"Root handler: Calling handle_tmdb_request with path={tmdb_path}, params={params}")
+                # Создаем копию параметров для передачи в handle_tmdb_request
+                tmdb_params = params.copy()
+                result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+                if "error" in result:
+                    return JSONResponse(content=result, status_code=500)
+                else:
+                    return JSONResponse(
+                        content=result,
+                        status_code=200,
+                        headers={"Cache-Control": "public, max-age=3600"}
+                    )
+        except Exception as e:
+            print(f"Error handling root TMDB request: {e}")
+            return JSONResponse(
+                content={"error": "Root TMDB error", "message": str(e)},
+                status_code=500
+            )
+    
+    # Проверяем специальные пути
+    path = request.url.path.lstrip("/")
+    
+    # Обрабатываем специальные пути
+    if path.startswith("top/fire/") or path.startswith("top/hundred/"):
+        # Определяем тип контента (movie/tv)
+        content_type = path.split("/")[-1]
+        
+        # Извлекаем параметры из запроса
+        params = dict(request.query_params)
+        
+        # Формируем параметры для TMDB
+        tmdb_params = {
+            "sort_by": "vote_average.desc",
+            "vote_count.gte": "1000",
+            "vote_average.gte": "7.0" if "fire" in path else "8.0"
+        }
+        
+        # Добавляем параметр page если он есть
+        if "page" in params:
+            tmdb_params["page"] = params["page"]
+        
+        # Используем правильный путь для TMDB
+        tmdb_path = f"discover/{content_type}"
+        
+        # Получаем данные из TMDB
+        result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+        
+        if "error" in result:
+            return {
+                "page": 1,
+                "results": [],
+                "total_pages": 1,
+                "total_results": 0
+            }
+        else:
+            return result
+    
+    elif path.startswith("collections/"):
+        collection_id = path.split("/")[1]
+        
+        # Извлекаем параметры из запроса
+        params = dict(request.query_params)
+        
+        # Получаем коллекцию из TMDB
+        tmdb_path = f"collection/{collection_id}"
+        tmdb_params = {}
+        
+        # Добавляем параметр page если он есть
+        if "page" in params:
+            tmdb_params["page"] = params["page"]
+        
+        result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+        
+        if "error" in result:
+            return {
+                "page": 1,
+                "results": [],
+                "total_pages": 1,
+                "total_results": 0
+            }
+        else:
+            return result
+    
+    # Если это не TMDB запрос, возвращаем базовую информацию
+    return {"status": "ok", "message": "Lampa API Server"}
+
+
 # --- TMDB PROXY ENDPOINTS ---
 @app.get("/apitmdb./{path:path}")
 async def tmdb_api_proxy(path: str, request: Request):
@@ -839,7 +1070,13 @@ async def tmdb_image_proxy(path: str, request: Request):
 
     try:
         # Формируем URL для изображения TMDB
-        image_url = f"https://image.tmdb.org/t/p/{path}"
+        # Убираем дублирование t/p/ в пути
+        if path.startswith("t/p/"):
+            image_path = path
+        else:
+            image_path = f"t/p/{path}"
+        
+        image_url = f"https://image.tmdb.org/{image_path}"
 
         print(f"TMDB Image Proxy: {image_url}")
 
@@ -879,30 +1116,51 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
 
         # Специальная обработка для top/hundred и top/fire
         if path.startswith("top/hundred/") or path.startswith("top/fire/"):
-            # Возвращаем заглушку для этих специальных путей
-            return {
-                "page": 1,
-                "results": [
-                    {"id": 1, "title": f"Top {path.split('/')[-1]} Item 1", "type": path.split('/')[-1]},
-                    {"id": 2, "title": f"Top {path.split('/')[-1]} Item 2", "type": path.split('/')[-1]},
-                    {"id": 3, "title": f"Top {path.split('/')[-1]} Item 3", "type": path.split('/')[-1]}
-                ],
-                "total_pages": 1,
-                "total_results": 3
+            # Определяем тип контента (movie/tv)
+            content_type = path.split("/")[-1]
+            
+            # Формируем параметры для TMDB
+            tmdb_params = {
+                "sort_by": "vote_average.desc",
+                "vote_count.gte": "1000",
+                "vote_average.gte": "7.0" if "fire" in path else "8.0"
             }
+            
+            # Используем правильный путь для TMDB
+            tmdb_path = f"discover/{content_type}"
+            
+            # Получаем данные из TMDB
+            result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+            
+            if "error" in result:
+                return {
+                    "page": 1,
+                    "results": [],
+                    "total_pages": 1,
+                    "total_results": 0
+                }
+            else:
+                return result
 
         # Специальная обработка для collections
         if path.startswith("collections/"):
             collection_id = path.split("/")[1]
-            return {
-                "page": 1,
-                "results": [
-                    {"id": 1, "title": f"Collection {collection_id} Item 1", "type": "movie"},
-                    {"id": 2, "title": f"Collection {collection_id} Item 2", "type": "tv"}
-                ],
-                "total_pages": 1,
-                "total_results": 2
-            }
+            
+            # Получаем коллекцию из TMDB
+            tmdb_path = f"collection/{collection_id}"
+            tmdb_params = {}
+            
+            result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+            
+            if "error" in result:
+                return {
+                    "page": 1,
+                    "results": [],
+                    "total_pages": 1,
+                    "total_results": 0
+                }
+            else:
+                return result
 
         # Подготавливаем параметры для TMDB
         tmdb_params = dict(params)
@@ -926,6 +1184,31 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
         # Обрабатываем специальные параметры Lampa
         if "genres" in tmdb_params:
             tmdb_params["with_genres"] = tmdb_params.pop("genres")
+        
+        # Обрабатываем параметр genre
+        if "genre" in tmdb_params:
+            genre_id = tmdb_params.pop("genre")
+            
+            # Используем ИСКЛЮЧАЮЩИЙ фильтр вместо включающего
+            # Это заставит TMDB возвращать только контент с этим жанром
+            tmdb_params["with_genres"] = genre_id
+            
+            # Убираем популярность как критерий сортировки
+            if "sort_by" in tmdb_params:
+                del tmdb_params["sort_by"]
+            
+            # Используем строгую сортировку по рейтингу
+            tmdb_params["sort_by"] = "vote_average.desc"
+            tmdb_params["vote_count.gte"] = "50"
+            tmdb_params["vote_average.gte"] = "6.0"
+                
+            # Добавляем фильтр по дате для исключения будущих релизов
+            if "primary_release_date.gte" not in tmdb_params and "first_air_date.gte" not in tmdb_params:
+                current_year = datetime.now().year
+                if "cat" in tmdb_params and tmdb_params["cat"] == "tv":
+                    tmdb_params["first_air_date.lte"] = f"{current_year}-12-31"
+                else:
+                    tmdb_params["primary_release_date.lte"] = f"{current_year}-12-31"
 
         # Обрабатываем фильтры
         if "filter" in tmdb_params:
@@ -1156,19 +1439,70 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
                 tmdb_url = f"https://api.themoviedb.org/3/{path}"
             else:
                 # Обычный прокси для других запросов
-                tmdb_url = f"https://api.themoviedb.org/3/{path}"
+                # Проверяем, не начинается ли путь с "3/"
+                if path.startswith("3/"):
+                    clean_path = path[2:]  # Убираем "3/"
+                    tmdb_url = f"https://api.themoviedb.org/3/{clean_path}"
+                else:
+                    tmdb_url = f"https://api.themoviedb.org/3/{path}"
 
-        print(f"TMDB Request: {tmdb_url}")
-        print(f"TMDB Params: {tmdb_params}")
+
 
         async with httpx.AsyncClient() as client:
             response = await client.get(tmdb_url, params=tmdb_params)
 
             if response.status_code == 200:
-                return response.json()
-            else:
-                print(f"TMDB API error: {response.status_code}")
-                return {"error": "TMDB API error", "status": response.status_code}
+                data = response.json()
+                
+                        # Фильтруем фильмы, которые еще не вышли (дата выхода в будущем)
+        # Но только для запросов, которые не связаны с now_playing
+        if "results" in data and isinstance(data["results"], list):
+            # Проверяем, является ли это запросом now_playing
+            is_now_playing = False
+            if "with_release_type" in tmdb_params and tmdb_params["with_release_type"] == "1":
+                is_now_playing = True
+            
+            # Также проверяем по пути запроса
+            if "discover/movie" in tmdb_url and "with_release_type" in tmdb_params:
+                is_now_playing = True
+            
+            # Фильтруем фильмы с будущими датами (кроме now_playing)
+            if not is_now_playing:
+                current_date = datetime.now().date()
+                filtered_results = []
+                original_count = len(data["results"])
+                
+                for item in data["results"]:
+                    # Проверяем дату выхода для фильмов
+                    if "release_date" in item and item["release_date"]:
+                        try:
+                            release_date = datetime.strptime(item["release_date"], "%Y-%m-%d").date()
+                            if release_date <= current_date:
+                                filtered_results.append(item)
+                        except:
+                            # Если не можем распарсить дату, включаем фильм
+                            filtered_results.append(item)
+                    # Проверяем дату выхода для сериалов
+                    elif "first_air_date" in item and item["first_air_date"]:
+                        try:
+                            air_date = datetime.strptime(item["first_air_date"], "%Y-%m-%d").date()
+                            if air_date <= current_date:
+                                filtered_results.append(item)
+                        except:
+                            # Если не можем распарсить дату, включаем сериал
+                            filtered_results.append(item)
+                    else:
+                        # Если нет даты, включаем
+                        filtered_results.append(item)
+                
+                data["results"] = filtered_results
+                data["total_results"] = len(filtered_results)
+
+            
+            return data
+        elif response.status_code != 200:
+            print(f"TMDB API error: {response.status_code}")
+            return {"error": "TMDB API error", "status": response.status_code}
 
     except Exception as e:
         print(f"Error in TMDB handler: {e}")
@@ -1193,6 +1527,118 @@ async def tmdb_proxy(path: str, request: Request):
             headers={"Cache-Control": "public, max-age=3600"}
         )
 
+
+@app.get("/top/fire/{content_type}")
+async def top_fire_handler(content_type: str, request: Request):
+    """Handle top fire requests"""
+    try:
+        # Извлекаем параметры из запроса
+        params = dict(request.query_params)
+        
+        # Формируем параметры для TMDB
+        tmdb_params = {
+            "sort_by": "vote_average.desc",
+            "vote_count.gte": "1000",
+            "vote_average.gte": "7.0"
+        }
+        
+        # Добавляем параметр page если он есть
+        if "page" in params:
+            tmdb_params["page"] = params["page"]
+        
+        # Используем правильный путь для TMDB
+        tmdb_path = f"discover/{content_type}"
+        
+        # Получаем данные из TMDB
+        result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+        
+        if "error" in result:
+            return {
+                "page": 1,
+                "results": [],
+                "total_pages": 1,
+                "total_results": 0
+            }
+        else:
+            return result
+            
+    except Exception as e:
+        return {
+            "page": 1,
+            "results": [],
+            "total_pages": 1,
+            "total_results": 0
+        }
+
+@app.get("/top/hundred/{content_type}")
+async def top_hundred_handler(content_type: str, request: Request):
+    """Handle top hundred requests"""
+    try:
+        # Извлекаем параметры из запроса
+        params = dict(request.query_params)
+        
+        # Формируем параметры для TMDB
+        tmdb_params = {
+            "sort_by": "vote_average.desc",
+            "vote_count.gte": "1000",
+            "vote_average.gte": "8.0"
+        }
+        
+        # Добавляем параметр page если он есть
+        if "page" in params:
+            tmdb_params["page"] = params["page"]
+        
+        # Используем правильный путь для TMDB
+        tmdb_path = f"discover/{content_type}"
+        
+        # Получаем данные из TMDB
+        result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+        
+        if "error" in result:
+            return {
+                "page": 1,
+                "results": [],
+                "total_pages": 1,
+                "total_results": 0
+            }
+        else:
+            return result
+            
+    except Exception as e:
+        return {
+            "page": 1,
+            "results": [],
+            "total_pages": 1,
+            "total_results": 0
+        }
+
+@app.get("/collections/{collection_id}")
+async def collections_handler(collection_id: str, request: Request):
+    """Handle collections requests"""
+    try:
+        # Получаем коллекцию из TMDB
+        tmdb_path = f"collection/{collection_id}"
+        tmdb_params = {}
+        
+        result = await handle_tmdb_request(tmdb_path, tmdb_params, request)
+        
+        if "error" in result:
+            return {
+                "page": 1,
+                "results": [],
+                "total_pages": 1,
+                "total_results": 0
+            }
+        else:
+            return result
+            
+    except Exception as e:
+        return {
+            "page": 1,
+            "results": [],
+            "total_pages": 1,
+            "total_results": 0
+        }
 
 @app.get("/{path:path}")
 async def catch_all_subdomains(path: str, request: Request):
@@ -1246,14 +1692,20 @@ async def catch_all_subdomains(path: str, request: Request):
             )
 
     # Handle imagetmdb subdomain
-    if path.startswith("imagetmdb.") or "imagetmdb." in str(request.url):
+    if path.startswith("imagetmdb.") or "imagetmdb." in str(request.url) or path.startswith("t/p/"):
         # Проксируем запросы к изображениям TMDB
         try:
             # Убираем префикс imagetmdb. из пути если есть
             image_path = path.replace("imagetmdb.", "") if path.startswith("imagetmdb.") else path
 
             # Формируем URL для изображения TMDB
-            image_url = f"https://image.tmdb.org/t/p/{image_path}"
+            # Убираем дублирование t/p/ в пути
+            if image_path.startswith("t/p/"):
+                final_image_path = image_path
+            else:
+                final_image_path = f"t/p/{image_path}"
+            
+            image_url = f"https://image.tmdb.org/{final_image_path}"
 
             print(f"Proxying image from TMDB (GET): {image_url}")
 
@@ -1280,11 +1732,41 @@ async def catch_all_subdomains(path: str, request: Request):
                 status_code=500
             )
 
-    # Handle tmdb subdomain
-    if path.startswith("tmdb.") or "tmdb." in str(request.url):
+    # Handle tmdb subdomain - это основной случай для Lampa
+    if path.startswith("tmdb.") or "tmdb." in str(request.url) or "tmdb." in str(request.headers.get("host", "")):
         try:
             # Убираем префикс tmdb. из пути если есть
             tmdb_path = path.replace("tmdb.", "") if path.startswith("tmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Используем унифицированный обработчик
+            result = await handle_tmdb_request(tmdb_path, params, request)
+
+            if "error" in result:
+                return JSONResponse(
+                    content=result,
+                    status_code=500
+                )
+            else:
+                return JSONResponse(
+                    content=result,
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+
+        except Exception as e:
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    # Handle apitmdb subdomain
+    if path.startswith("apitmdb.") or "apitmdb." in str(request.url) or "apitmdb." in str(request.headers.get("host", "")):
+        try:
+            # Убираем префикс apitmdb. из пути если есть
+            tmdb_path = path.replace("apitmdb.", "") if path.startswith("apitmdb.") else path
 
             # Собираем параметры запроса
             params = dict(request.query_params)
@@ -1370,7 +1852,13 @@ async def catch_all_api_routes(path: str, request: Request):
             image_path = path.replace("imagetmdb.", "") if path.startswith("imagetmdb.") else path
 
             # Формируем URL для изображения TMDB
-            image_url = f"https://image.tmdb.org/t/p/{image_path}"
+            # Убираем дублирование t/p/ в пути
+            if image_path.startswith("t/p/"):
+                final_image_path = image_path
+            else:
+                final_image_path = f"t/p/{image_path}"
+            
+            image_url = f"https://image.tmdb.org/{final_image_path}"
 
             async with httpx.AsyncClient() as client:
                 response = await client.get(image_url)
@@ -1399,6 +1887,35 @@ async def catch_all_api_routes(path: str, request: Request):
         try:
             # Убираем префикс tmdb. из пути если есть
             tmdb_path = path.replace("tmdb.", "") if path.startswith("tmdb.") else path
+
+            # Собираем параметры запроса
+            params = dict(request.query_params)
+
+            # Используем унифицированный обработчик
+            result = await handle_tmdb_request(tmdb_path, params, request)
+
+            if "error" in result:
+                return JSONResponse(
+                    content=result,
+                    status_code=500
+                )
+            else:
+                return JSONResponse(
+                    content=result,
+                    status_code=200,
+                    headers={"Cache-Control": "public, max-age=3600"}
+                )
+
+        except Exception as e:
+            return JSONResponse(
+                content={"error": "Proxy error", "message": str(e)},
+                status_code=500
+            )
+
+    if path.startswith("apitmdb.") or "apitmdb." in str(request.url):
+        try:
+            # Убираем префикс apitmdb. из пути если есть
+            tmdb_path = path.replace("apitmdb.", "") if path.startswith("apitmdb.") else path
 
             # Собираем параметры запроса
             params = dict(request.query_params)

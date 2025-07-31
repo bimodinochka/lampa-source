@@ -65,9 +65,14 @@ Object.defineProperty(object, 'soc_mirrors', {
  */
 Object.defineProperty(object, 'cub_domain', { 
     get: ()=> {
+        // Принудительно используем localhost для разработки
+        if(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            return 'localhost:8000'
+        }
+        
         let use = localStorage.getItem('cub_domain') || object.cub_site
 
-        return object.cub_site
+        return use
     } 
 })
 
