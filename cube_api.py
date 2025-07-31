@@ -1448,61 +1448,65 @@ async def handle_tmdb_request(path: str, params: dict, request: Request):
 
 
 
+        print(f"TMDB Request: {tmdb_url}")
+        print(f"TMDB Params: {tmdb_params}")
+        
         async with httpx.AsyncClient() as client:
             response = await client.get(tmdb_url, params=tmdb_params)
+            
+            print(f"TMDB Response Status: {response.status_code}")
 
             if response.status_code == 200:
                 data = response.json()
                 
-                        # Фильтруем фильмы, которые еще не вышли (дата выхода в будущем)
-        # Но только для запросов, которые не связаны с now_playing
-        if "results" in data and isinstance(data["results"], list):
-            # Проверяем, является ли это запросом now_playing
-            is_now_playing = False
-            if "with_release_type" in tmdb_params and tmdb_params["with_release_type"] == "1":
-                is_now_playing = True
-            
-            # Также проверяем по пути запроса
-            if "discover/movie" in tmdb_url and "with_release_type" in tmdb_params:
-                is_now_playing = True
-            
-            # Фильтруем фильмы с будущими датами (кроме now_playing)
-            if not is_now_playing:
-                current_date = datetime.now().date()
-                filtered_results = []
-                original_count = len(data["results"])
-                
-                for item in data["results"]:
-                    # Проверяем дату выхода для фильмов
-                    if "release_date" in item and item["release_date"]:
-                        try:
-                            release_date = datetime.strptime(item["release_date"], "%Y-%m-%d").date()
-                            if release_date <= current_date:
+                # Фильтруем фильмы, которые еще не вышли (дата выхода в будущем)
+                # Но только для запросов, которые не связаны с now_playing
+                if "results" in data and isinstance(data["results"], list):
+                    # Проверяем, является ли это запросом now_playing
+                    is_now_playing = False
+                    if "with_release_type" in tmdb_params and tmdb_params["with_release_type"] == "1":
+                        is_now_playing = True
+                    
+                    # Также проверяем по пути запроса
+                    if "discover/movie" in tmdb_url and "with_release_type" in tmdb_params:
+                        is_now_playing = True
+                    
+                    # Фильтруем фильмы с будущими датами (кроме now_playing)
+                    if not is_now_playing:
+                        current_date = datetime.now().date()
+                        filtered_results = []
+                        original_count = len(data["results"])
+                        
+                        for item in data["results"]:
+                            # Проверяем дату выхода для фильмов
+                            if "release_date" in item and item["release_date"]:
+                                try:
+                                    release_date = datetime.strptime(item["release_date"], "%Y-%m-%d").date()
+                                    if release_date <= current_date:
+                                        filtered_results.append(item)
+                                except:
+                                    # Если не можем распарсить дату, включаем фильм
+                                    filtered_results.append(item)
+                            # Проверяем дату выхода для сериалов
+                            elif "first_air_date" in item and item["first_air_date"]:
+                                try:
+                                    air_date = datetime.strptime(item["first_air_date"], "%Y-%m-%d").date()
+                                    if air_date <= current_date:
+                                        filtered_results.append(item)
+                                except:
+                                    # Если не можем распарсить дату, включаем сериал
+                                    filtered_results.append(item)
+                            else:
+                                # Если нет даты, включаем
                                 filtered_results.append(item)
-                        except:
-                            # Если не можем распарсить дату, включаем фильм
-                            filtered_results.append(item)
-                    # Проверяем дату выхода для сериалов
-                    elif "first_air_date" in item and item["first_air_date"]:
-                        try:
-                            air_date = datetime.strptime(item["first_air_date"], "%Y-%m-%d").date()
-                            if air_date <= current_date:
-                                filtered_results.append(item)
-                        except:
-                            # Если не можем распарсить дату, включаем сериал
-                            filtered_results.append(item)
-                    else:
-                        # Если нет даты, включаем
-                        filtered_results.append(item)
-                
-                data["results"] = filtered_results
-                data["total_results"] = len(filtered_results)
+                        
+                        data["results"] = filtered_results
+                        data["total_results"] = len(filtered_results)
 
-            
-            return data
-        elif response.status_code != 200:
-            print(f"TMDB API error: {response.status_code}")
-            return {"error": "TMDB API error", "status": response.status_code}
+                return data
+            else:
+                print(f"TMDB API error: {response.status_code}")
+                return {"error": "TMDB API error", "status": response.status_code}
 
     except Exception as e:
         print(f"Error in TMDB handler: {e}")
@@ -2063,6 +2067,7 @@ async def debug_endpoint(request: Request):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time communication"""
     await websocket.accept()
+    print("WebSocket connection accepted")
 
     try:
         while True:
@@ -2075,7 +2080,13 @@ async def websocket_endpoint(websocket: WebSocket):
             # Обрабатываем разные типы сообщений
             if message.get("method") == "check_token":
                 # Проверяем токен и премиум статус
+                # Токен может быть в разных местах сообщения
                 token = message.get("data", {}).get("token")
+                if not token:
+                    # Попробуем найти токен в account
+                    account = message.get("account", {})
+                    token = account.get("token")
+                
                 print(f"WebSocket check_token: token={token}")
                 if token:
                     status = check_premium_status(token)
@@ -2094,10 +2105,15 @@ async def websocket_endpoint(websocket: WebSocket):
                     response = {
                         "method": "check_token",
                         "status": "invalid",
-                        "data": {"valid": False, "premium": False}
+                        "data": {
+                            "valid": False, 
+                            "premium": False,
+                            "premium_expiry": 0,
+                            "current_time": int(time.time())
+                        }
                     }
 
-                await websocket.send_text(json.dumps(response))
+
 
             elif message.get("method") == "start":
                 # Обрабатываем сообщение start с правильным премиум статусом
@@ -2161,6 +2177,13 @@ async def websocket_endpoint(websocket: WebSocket):
         print("WebSocket disconnected")
     except Exception as e:
         print(f"WebSocket error: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "method": "error",
+                "error": str(e)
+            }))
+        except:
+            pass
 
 
 # --- UNIVERSAL API FALLBACK ---

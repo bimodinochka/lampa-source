@@ -1,17 +1,63 @@
 {
   "profiles": [
-    {"id": 153918, "name": "Общий", "main": true, "icon": "l_1"},
-    {"id": 153919, "name": "Детский", "main": false, "icon": "l_2"}
+    {
+      "id": 153918,
+      "name": "Общий",
+      "main": true,
+      "icon": "l_1"
+    },
+    {
+      "id": 153919,
+      "name": "Детский",
+      "main": false,
+      "icon": "l_2"
+    }
   ],
   "devices": [
-    {"id": 1, "name": "TV", "platform": "webos", "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="},
-    {"id": 2, "name": "Mobile", "platform": "android", "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="},
-    {"id": 3, "name": "Browser", "platform": "browser", "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="},
-    {"id": 4, "name": "Browser - Lampa", "platform": "browser", "token": "test_token_123"}
+    {
+      "id": 1,
+      "name": "TV",
+      "platform": "webos",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    {
+      "id": 2,
+      "name": "Mobile",
+      "platform": "android",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    {
+      "id": 3,
+      "name": "Browser",
+      "platform": "browser",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    {
+      "id": 4,
+      "name": "Browser - Lampa",
+      "platform": "browser",
+      "token": "test_token_123"
+    }
   ],
   "bookmarks": [
-    {"id": 1, "card_id": "123", "type": "movie", "data": {"title": "Test Movie"}, "time": 1640995200},
-    {"id": 2, "card_id": "456", "type": "tv", "data": {"title": "Test Series"}, "time": 1640995200}
+    {
+      "id": 1,
+      "card_id": "123",
+      "type": "movie",
+      "data": {
+        "title": "Test Movie"
+      },
+      "time": 1640995200
+    },
+    {
+      "id": 2,
+      "card_id": "456",
+      "type": "tv",
+      "data": {
+        "title": "Test Series"
+      },
+      "time": 1640995200
+    }
   ],
   "notifications": [
     {
@@ -42,33 +88,114 @@
     }
   ],
   "logs": [
-    {"level": "info", "message": "App started", "timestamp": 1640995200},
-    {"level": "error", "message": "Connection failed", "timestamp": 1640995200}
+    {
+      "level": "info",
+      "message": "App started",
+      "timestamp": 1640995200
+    },
+    {
+      "level": "error",
+      "message": "Connection failed",
+      "timestamp": 1640995200
+    }
   ],
   "person_subscribes": [
-    {"id": 1, "name": "John Doe", "profile_path": "/test.jpg"},
-    {"id": 2, "name": "Jane Smith", "profile_path": "/test2.jpg"}
+    {
+      "id": 1,
+      "name": "John Doe",
+      "profile_path": "/test.jpg"
+    },
+    {
+      "id": 2,
+      "name": "Jane Smith",
+      "profile_path": "/test2.jpg"
+    },
+    {
+      "adult": false,
+      "also_known_as": [
+        "Ice Cube Nwa",
+        "O'Shea Jackson",
+        "Westside Connection",
+        "N.W.A.",
+        "NWA",
+        "ო’ში ჯექსონი (Ice Cube)"
+      ],
+      "biography": "О’Ши Дже́ксон (англ. O'Shea Jackson), более известный под псевдонимом Айс Кьюб (англ. Ice Cube; род. 15 июня 1969, Лос-Анджелес) — американский рэпер, актёр, сценарист, режиссёр и композитор. Один из первопроходцев гангста-рэпа. Бывший участник N.W.A. Его псевдоним переводится как «кубик льда».",
+      "birthday": "1969-06-15",
+      "deathday": null,
+      "gender": 2,
+      "homepage": "https://icecube.com",
+      "id": 9778,
+      "imdb_id": "nm0001084",
+      "known_for_department": "Acting",
+      "name": "Айс Кьюб",
+      "place_of_birth": "Los Angeles, California, USA",
+      "popularity": 2.9771,
+      "profile_path": "/ymR7Yll7HjL6i6Z3pt435hYi91T.jpg",
+      "url": "person/9778"
+    }
   ],
   "discuss": {
     "movie_123_1_ru": {
       "result": [
-        {"id": 1, "email": "user@test.com", "comment": "Great movie!", "like": 5}
+        {
+          "id": 1,
+          "email": "user@test.com",
+          "comment": "Great movie!",
+          "like": 5
+        }
       ],
       "total": 1,
       "total_pages": 1
     }
   },
   "reactions": {
-    "movie_123": {"result": [{"type": "like", "count": 10}]},
-    "tv_456": {"result": [{"type": "dislike", "count": 2}]}
+    "movie_123": {
+      "result": [
+        {
+          "type": "like",
+          "count": 10
+        }
+      ]
+    },
+    "tv_456": {
+      "result": [
+        {
+          "type": "dislike",
+          "count": 2
+        }
+      ]
+    }
   },
   "collections": [
-    {"id": 1, "title": "Action Movies", "category": "new"},
-    {"id": 2, "title": "Comedy Series", "category": "new"}
+    {
+      "id": 1,
+      "title": "Action Movies",
+      "category": "new"
+    },
+    {
+      "id": 2,
+      "title": "Comedy Series",
+      "category": "new"
+    }
   ],
   "trailers": {
-    "added": {"results": [{"title": "Trailer 1", "url": "http://test.com"}]},
-    "popular": {"results": [{"title": "Trailer 2", "url": "http://test.com"}]},
+    "added": {
+      "results": [
+        {
+          "title": "Trailer 1",
+          "url": "http://test.com"
+        }
+      ]
+    },
+    "popular": {
+      "results": [
+        {
+          "title": "Trailer 2",
+          "url": "http://test.com"
+        }
+      ]
+    },
     "trending_1": [
       {
         "adult": false,
@@ -80,7 +207,11 @@
         "poster_path": "/egDAs0vh2SzTR07eUzdcC1XYkTS.jpg",
         "media_type": "movie",
         "original_language": "en",
-        "genre_ids": [28, 27, 10752],
+        "genre_ids": [
+          28,
+          27,
+          10752
+        ],
         "popularity": 5.5751,
         "release_date": "2025-08-21",
         "video": false,
@@ -97,7 +228,11 @@
         "poster_path": "/acbGEyI3CsLuT4gjw9NNcdkM3er.jpg",
         "media_type": "movie",
         "original_language": "en",
-        "genre_ids": [878, 12, 14],
+        "genre_ids": [
+          878,
+          12,
+          14
+        ],
         "popularity": 23.9764,
         "release_date": "2025-12-17",
         "video": false,
@@ -107,8 +242,18 @@
     ]
   },
   "timeline": [
-    {"id": 1, "title": "Movie 1", "progress": 50, "time": 1640995200},
-    {"id": 2, "title": "Series 1", "progress": 25, "time": 1640995200}
+    {
+      "id": 1,
+      "title": "Movie 1",
+      "progress": 50,
+      "time": 1640995200
+    },
+    {
+      "id": 2,
+      "title": "Series 1",
+      "progress": 25,
+      "time": 1640995200
+    }
   ],
   "feed": [
     {
@@ -145,67 +290,187 @@
     }
   ],
   "ad_stat": [
-    {"platform": "webos", "type": "video", "method": "launch", "name": "test"}
+    {
+      "platform": "webos",
+      "type": "video",
+      "method": "launch",
+      "name": "test"
+    }
   ],
   "ad_all": [
-    {"url": "http://test.com/ad1.mp4", "volume": 0.5, "duration": 30},
-    {"url": "http://test.com/ad2.mp4", "volume": 0.3, "duration": 15}
+    {
+      "url": "http://test.com/ad1.mp4",
+      "volume": 0.5,
+      "duration": 30
+    },
+    {
+      "url": "http://test.com/ad2.mp4",
+      "volume": 0.3,
+      "duration": 15
+    }
   ],
-  "ad_vast": {"ad": [{"name": "vast_ad", "active": true, "platforms": ["webos"]}]},
+  "ad_vast": {
+    "ad": [
+      {
+        "name": "vast_ad",
+        "active": true,
+        "platforms": [
+          "webos"
+        ]
+      }
+    ]
+  },
   "adv_log": [
-    {"platform": "webos", "event": "impression", "timestamp": 1640995200}
+    {
+      "platform": "webos",
+      "event": "impression",
+      "timestamp": 1640995200
+    }
   ],
   "event_prime": [
-    {"name": "test_event", "msg": "test_message", "timestamp": 1640995200}
+    {
+      "name": "test_event",
+      "msg": "test_message",
+      "timestamp": 1640995200
+    }
   ],
   "ai_facts": {
-    "123_movie": {"results": [{"fact": "Interesting fact about movie"}]},
-    "456_tv": {"results": [{"fact": "Interesting fact about series"}]}
+    "123_movie": {
+      "results": [
+        {
+          "fact": "Interesting fact about movie"
+        }
+      ]
+    },
+    "456_tv": {
+      "results": [
+        {
+          "fact": "Interesting fact about series"
+        }
+      ]
+    }
   },
   "ai_recommend": {
-    "123_movie": {"results": [{"title": "Recommended Movie", "id": "789"}]},
-    "456_tv": {"results": [{"title": "Recommended Series", "id": "101"}]}
+    "123_movie": {
+      "results": [
+        {
+          "title": "Recommended Movie",
+          "id": "789"
+        }
+      ]
+    },
+    "456_tv": {
+      "results": [
+        {
+          "title": "Recommended Series",
+          "id": "101"
+        }
+      ]
+    }
   },
   "ai_search": {
-    "test": {"results": [{"title": "Search Result", "id": "999"}]}
+    "test": {
+      "results": [
+        {
+          "title": "Search Result",
+          "id": "999"
+        }
+      ]
+    }
   },
   "plugins_blacklist": [
-    {"url": "http://malicious.com/plugin.js"},
-    {"url": "http://spam.com/plugin.js"}
+    {
+      "url": "http://malicious.com/plugin.js"
+    },
+    {
+      "url": "http://spam.com/plugin.js"
+    }
   ],
   "iptv": {
-    "channels": [{"id": 1, "name": "Test Channel", "url": "http://test.com/stream"}],
-    "playlists": [{"id": 1, "name": "Test Playlist", "url": "http://test.com/playlist"}],
-    "time": {"current_time": 1640995200, "timezone": "UTC"},
+    "channels": [
+      {
+        "id": 1,
+        "name": "Test Channel",
+        "url": "http://test.com/stream"
+      }
+    ],
+    "playlists": [
+      {
+        "id": 1,
+        "name": "Test Playlist",
+        "url": "http://test.com/playlist"
+      }
+    ],
+    "time": {
+      "current_time": 1640995200,
+      "timezone": "UTC"
+    },
     "program": {
       "1_1640995200": {
         "channel_id": 1,
         "time": 1640995200,
         "programs": [
-          {"title": "Morning News", "start": 1640995200, "end": 1640998800},
-          {"title": "Afternoon Show", "start": 1640998800, "end": 1641002400}
+          {
+            "title": "Morning News",
+            "start": 1640995200,
+            "end": 1640998800
+          },
+          {
+            "title": "Afternoon Show",
+            "start": 1640998800,
+            "end": 1641002400
+          }
         ]
       }
     }
   },
   "collections_liked": [
-    {"id": 1, "title": "Liked Collection 1", "category": "action"},
-    {"id": 2, "title": "Liked Collection 2", "category": "comedy"}
+    {
+      "id": 1,
+      "title": "Liked Collection 1",
+      "category": "action"
+    },
+    {
+      "id": 2,
+      "title": "Liked Collection 2",
+      "category": "comedy"
+    }
   ],
   "collections_view": {
     "test_url_1": {
       "page": 1,
       "results": [
-        {"id": 1, "title": "Collection Item 1", "type": "movie"},
-        {"id": 2, "title": "Collection Item 2", "type": "tv"}
+        {
+          "id": 1,
+          "title": "Collection Item 1",
+          "type": "movie"
+        },
+        {
+          "id": 2,
+          "title": "Collection Item 2",
+          "type": "tv"
+        }
       ],
       "total_pages": 3
     }
   },
-  "checker": {"status": "ok", "mirror": "test_mirror"},
+  "checker": {
+    "status": "ok",
+    "mirror": "test_mirror"
+  },
   "device_codes": {
-    "123456": {"device_id": 1, "name": "TV Device", "platform": "webos", "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="},
-    "654321": {"device_id": 2, "name": "Mobile Device", "platform": "android", "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="}
+    "123456": {
+      "device_id": 1,
+      "name": "TV Device",
+      "platform": "webos",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    "654321": {
+      "device_id": 2,
+      "name": "Mobile Device",
+      "platform": "android",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    }
   },
   "plugins": [
     {
@@ -554,14 +819,18 @@
     "message": "Account reset. Please clear localStorage and reload page.",
     "clear_storage": [
       "account",
-      "account_user", 
+      "account_user",
       "account_email",
       "account_notice",
       "account_bookmarks"
     ]
   },
   "notices": [
-    {"id": 1, "title": "Test Notice", "message": "Test"}
+    {
+      "id": 1,
+      "title": "Test Notice",
+      "message": "Test"
+    }
   ],
   "person_list": [
     {
@@ -618,4 +887,4 @@
       "last_tv": ""
     }
   ]
-} 
+}
