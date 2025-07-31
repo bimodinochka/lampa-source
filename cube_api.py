@@ -589,7 +589,7 @@ async def ai_generate_facts(card_id: str, card_type: str, token: str = Header(No
     
     # Get AI facts from test data
     key = f"{card_id}_{card_type}"
-    ai_facts = test_data.get("ai_facts", {})
+    ai_facts = get_test_data("ai_facts", {})
     card_facts = ai_facts.get(key, {})
     
     if card_facts and "results" in card_facts:
@@ -612,7 +612,7 @@ async def ai_generate_recommendations(card_id: str, card_type: str, token: str =
     
     # Get AI recommendations from test data
     key = f"{card_id}_{card_type}"
-    ai_recommend = test_data.get("ai_recommend", {})
+    ai_recommend = get_test_data("ai_recommend", {})
     card_recommendations = ai_recommend.get(key, {})
     
     if card_recommendations and "results" in card_recommendations:
@@ -634,7 +634,7 @@ async def ai_search(query: str, token: str = Header(None)):
         raise HTTPException(status_code=403, detail="Premium required")
     
     # Get AI search results from test data
-    ai_search_data = test_data.get("ai_search", {})
+    ai_search_data = get_test_data("ai_search", {})
     search_results = ai_search_data.get(query, {})
     
     if search_results and "results" in search_results:
@@ -725,7 +725,7 @@ async def users_backup_import(data: dict, token: str = Header(...)):
 # --- NOTICE ---
 @app.get("/api/notice/all")
 def get_notice_all(token: str = Header(...)):
-    return {"notices": get_test_data("notices", [{"id": 1, "title": "Test Notice", "message": "Test"}])}
+    return {"notice": get_test_data("notice", [])}
 
 
 # --- TORRENTS ---
