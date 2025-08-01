@@ -342,4 +342,4 @@ async def fallback_api(path: str, request: Request, token: Optional[str] = Heade
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8009)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

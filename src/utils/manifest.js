@@ -4,7 +4,7 @@ let object = {
     github_lampa: 'https://yumata.github.io/lampa/',
     css_version: '2.7.0',
     app_version: '2.4.6',
-    cub_site: 'localhost:8009'
+    cub_site: 'localhost:8000'
 }
 
 let plugins = []
@@ -25,7 +25,7 @@ Object.defineProperty(object, 'plugins', {
  * Старые зеркала, которые не используются больше, но могут быть полезны для обратной совместимости
  */
 Object.defineProperty(object, 'old_mirrors', { 
-    get: ()=> ['localhost:8009'],
+    get: ()=> ['cub.red', 'standby.cub.red', 'kurwa-bober.ninja', 'nackhui.com'],
     set: ()=> {}
 })
 
@@ -34,7 +34,7 @@ Object.defineProperty(object, 'old_mirrors', {
  */
 Object.defineProperty(object, 'cub_mirrors', { 
     get: ()=> {
-        let lampa = ['localhost:8009']
+        let lampa = ['localhost:8000', 'localhost:8000', 'localhost:8000']
         let users = localStorage.getItem('cub_mirrors') || '[]'
 
         try {
@@ -56,7 +56,7 @@ Object.defineProperty(object, 'cub_mirrors', {
  * Список зеркал для сокета, вынесены отдельно, так как могут отличаться от обычных зеркал
  */
 Object.defineProperty(object, 'soc_mirrors', { 
-    get: ()=> ['localhost:8009'],
+    get: ()=> ['cub.red', 'kurwa-bober.ninja', 'nackhui.com'],
     set: ()=> {}
 })
 
@@ -65,14 +65,9 @@ Object.defineProperty(object, 'soc_mirrors', {
  */
 Object.defineProperty(object, 'cub_domain', { 
     get: ()=> {
-        // Принудительно используем localhost для разработки
-        if(window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return 'localhost:8009'
-        }
-        
-        let use = localStorage.getItem('cub_domain') || object.cub_site
+        let use = localStorage.getItem('cub_domain') || 'localhost:8000'
 
-        return use
+        return object.cub_mirrors.indexOf(use) > -1 ? use : object.cub_mirrors[0]
     } 
 })
 

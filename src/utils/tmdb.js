@@ -16,13 +16,23 @@ function proxy(name){
 function api(url){
     let base  = Utils.protocol() + 'api.themoviedb.org/3/' + url
 
-    return Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_api') ? proxy('tmdb_proxy_api') + '/' + base : base
+    if(Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_api')){
+        let proxy_url = proxy('tmdb_proxy_api')
+        return proxy_url + '/' + url
+    }
+
+    return base
 }
 
 function image(url){
     let base  = Utils.protocol() + 'image.tmdb.org/' + url
 
-    return Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_image') ? proxy('tmdb_proxy_image') + '/' + base : base
+    if(Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_image')){
+        let proxy_url = proxy('tmdb_proxy_image')
+        return proxy_url + '/' + url
+    }
+
+    return base
 }
 
 function broken(){
