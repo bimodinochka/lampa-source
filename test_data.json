@@ -37,6 +37,24 @@
       "name": "Browser - Lampa",
       "platform": "browser",
       "token": "test_token_123"
+    },
+    {
+      "id": 5,
+      "name": "TV Device",
+      "platform": "webos",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    {
+      "id": 6,
+      "name": "TV Device",
+      "platform": "webos",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
+    },
+    {
+      "id": 7,
+      "name": "TV Device",
+      "platform": "webos",
+      "token": "eyJpZCI6MTQ4NjA4LCJoYXNoIjoiIn0=.g3Bo8q7lziySW/x1SAh+v/fYZMWF+ZZwciuGlYtTFRc="
     }
   ],
   "bookmarks": [
@@ -833,7 +851,7 @@
       "viewed_telegram": 1,
       "data": "{\"type\":\"new_episode\",\"card\":{\"poster_path\":\"/uFdIebgylj64d9ze6y1C5jsHUZZ.jpg\",\"overview\":\"Наемный убийца под именем Шакал выполняет самые сложные заказы и каждый раз скрывается от властей, меняя свою внешность. На след Шакала выходит сотрудница британской разведки Бьянка. Погоня за киллером пронесется через всю Европу, оставляя за собой кровавый след.\",\"id\":222766,\"original_title\":\"The Day of the Jackal\",\"original_language\":\"en\",\"title\":\"День Шакала\",\"backdrop_path\":\"/enVrO8TRkdT8dmYXTfI4sEjR5Kp.jpg\",\"popularity\":66.8498,\"vote_count\":694,\"vote_average\":8.195,\"imdb_id\":\"tt24053860\",\"original_name\":\"The Day of the Jackal\",\"name\":\"День Шакала\",\"first_air_date\":\"2024-11-07\",\"origin_country\":[\"GB\"],\"status\":\"Returning Series\",\"source\":\"tmdb\",\"number_of_seasons\":1,\"number_of_episodes\":10,\"next_episode_to_air\":null,\"img\":\"https://imagetmdb.durex.monster/t/p/w500/uFdIebgylj64d9ze6y1C5jsHUZZ.jpg?email=igor.tonin%40inbox.ru\",\"seasons\":{\"1\":10}},\"voice\":\"ColdFilm\"}",
       "date": "2025-07-30",
-      "time": 1753862040859,
+      "time": 1754048840984,
       "card_id": 222766,
       "method": "tv-voice",
       "profile": 153918,
@@ -848,7 +866,7 @@
       "viewed_telegram": 1,
       "data": "{\"type\":\"new_episode\",\"card\":{\"poster_path\":\"/nfttp2lquST92j4ItAYdmtdoj5t.jpg\",\"overview\":\"Cтранноватые истории из жизни нескольких третьеклашек из маленького городка Саус Парк в штате Колорадо. Это комедия с элементами гротеска, фарса, пародии, обильно сдобренная музыкой и той самой плохо определяемой словами чертовщиной…\",\"id\":2190,\"original_title\":\"South Park\",\"original_language\":\"en\",\"title\":\"Южный Парк\",\"backdrop_path\":\"/41neXsH222hV2zrsTyw8h7javon.jpg\",\"popularity\":171.8367,\"vote_count\":4600,\"vote_average\":8.359,\"imdb_id\":\"tt0121955\",\"original_name\":\"South Park\",\"name\":\"Южный Парк\",\"first_air_date\":\"1997-08-13\",\"origin_country\":[\"US\"],\"status\":\"Returning Series\",\"source\":\"tmdb\",\"number_of_seasons\":27,\"number_of_episodes\":331,\"next_episode_to_air\":{\"id\":6375016,\"name\":\"Эпизод 2\",\"overview\":\"\",\"vote_average\":0,\"vote_count\":0,\"air_date\":\"2025-07-30\",\"episode_number\":2,\"episode_type\":\"standard\",\"production_code\":\"\",\"runtime\":null,\"season_number\":27,\"show_id\":2190,\"still_path\":null},\"img\":\"https://imagetmdb.com/t/p/w500/nfttp2lquST92j4ItAYdmtdoj5t.jpg?email=igor.tonin%40inbox.ru\",\"seasons\":{\"27\":1}},\"voice\":\"HDrezka Studio\"}",
       "date": "2025-07-29",
-      "time": 1753815232323,
+      "time": 1754048840984,
       "card_id": 2190,
       "method": "tv-voice",
       "profile": 153918,
