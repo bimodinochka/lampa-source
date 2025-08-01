@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Header, HTTPException, Request, Form
+from fastapi.responses import PlainTextResponse
 from utils.test_data import get_test_data, update_test_data
 
 router = APIRouter(prefix="/api", tags=["debug"])
@@ -27,6 +28,17 @@ async def debug_endpoint(request: Request):
 def get_checker():
     """Mirror checker endpoint"""
     return get_test_data("checker", {})
+
+@router.post("/checker")
+async def post_checker(request: Request):
+    """Mirror checker endpoint - returns the sent data back for validation"""
+    try:
+        form_data = await request.form()
+        if 'data' in form_data:
+            return PlainTextResponse(content=form_data['data'])
+        return PlainTextResponse(content="")
+    except Exception as e:
+        return PlainTextResponse(content=str(e))
 
 
 # --- RESET ---

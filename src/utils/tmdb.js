@@ -1,5 +1,6 @@
 import Storage from './storage'
 import Utils from './math'
+import Manifest from './manifest'
 
 let broken_images = 0
 
@@ -16,9 +17,11 @@ function proxy(name){
 function api(url){
     let base  = Utils.protocol() + 'api.themoviedb.org/3/' + url
 
-    if(Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_api')){
-        let proxy_url = proxy('tmdb_proxy_api')
-        return proxy_url + '/' + url
+    if(Storage.field('proxy_tmdb')){
+        // Используем зеркало из манифеста для прокси
+        let domain = Manifest.cub_domain
+        let proxy_url = Utils.protocol() + 'apitmdb.' + domain + '/3/'
+        return proxy_url + url
     }
 
     return base
@@ -27,9 +30,11 @@ function api(url){
 function image(url){
     let base  = Utils.protocol() + 'image.tmdb.org/' + url
 
-    if(Storage.field('proxy_tmdb') && Storage.field('tmdb_proxy_image')){
-        let proxy_url = proxy('tmdb_proxy_image')
-        return proxy_url + '/' + url
+    if(Storage.field('proxy_tmdb')){
+        // Используем зеркало из манифеста для прокси
+        let domain = Manifest.cub_domain
+        let proxy_url = Utils.protocol() + 'imagetmdb.' + domain + '/'
+        return proxy_url + url
     }
 
     return base
